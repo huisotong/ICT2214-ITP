@@ -1,0 +1,35 @@
+Guide on whats going on:
+
+Backend:
+I used my ssd setup for this, since we using mysql need python to communicate with it, this is done through SQLAlchemy.
+/app/models is the respective tables for db
+/app/routes is your api endpoints (lets say deduct credits, my frontend will call localhost:5000/api/credits then my backend will send another request to dify if necessary for any info or functionality then i will perform wtv needed)
+(for the above logic with dify im not sure if this is the best way, will have to see more on what dify offers)
+/app/__init__.py is ur initialisation to set up cross origin with frontend as well as database connection
+/main.py runs the flask app
+/migrate.py is to make sure our tables in sql workbench tallies with our model (not so sure yet but i think no need care bout this first)
+
+
+Frontend:
+/public contains all your media
+everything else except /src in the root folder ignore its useless
+/src/main.jsx ignore
+/src/styles contains all the css files/folders
+/src/pages contains all our respective pages (will use react router)
+/src/components contains all respective components for respective pages (if you watched the video, you can see a page consists of many diff portions such as navbar posts etc, hence we split them up into smaller jsx files to be combined into the page later so we dont clutter the shit and we can reuse components if we want to)
+
+
+
+HOW TO RUN:
+make sure have node.js and python installed
+
+open 2 terminals one in frontend and one in backend
+frontend one do npm install to install all dependencies first then npm run dev    go to localhost:5173
+
+
+for backend do pip install -r requirements.txt  then do python main.py
+
+
+
+create .env for fe and be folders
+follow the .env.example template for each of them for what to put in the env
