@@ -1,0 +1,45 @@
+.main {
+  width: 100vw;
+  height: 100vh;
+  position: fixed;
+  background-color: white;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.modalcontainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.modalbox {
+  position: absolute;
+  top: 1.25rem;
+  width: 91.666667%;
+  text-align: center;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  border-radius: 0.375rem;
+  letter-spacing: 0.025em;
+  opacity: 0.8;
+  font-weight: 600;
+  font-size: 1.125rem;
+  color: #b91c1c;
+}
+
+.modalfail {
+  background-color: #fecaca;
+}
+
+.modalsuccess {
+  background-color: #4ade80;
+}
+
+@media (min-width: 768px) {
+  .modal-box {
+    width: 91.666667%;
+  }
+}

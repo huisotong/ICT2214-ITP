@@ -15,7 +15,8 @@ Frontend:
 everything else except /src in the root folder ignore its useless
 /src/main.jsx ignore
 /src/styles contains all the css files/folders
-/src/pages contains all our respective pages (will use react router)
+/src/pages contains all our respective pages
+/app.jsx just remember this is the top level which consists of our routes then if u confused with the file structure just start looking from here then control click to where you want go
 /src/components contains all respective components for respective pages (if you watched the video, you can see a page consists of many diff portions such as navbar posts etc, hence we split them up into smaller jsx files to be combined into the page later so we dont clutter the shit and we can reuse components if we want to)
 
 
