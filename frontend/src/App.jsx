@@ -10,8 +10,8 @@ import PrivateRoute from "./components/global/PrivateRoute";
 // Import pages
 import LoginPage from "./pages/LoginPage";
 import HomePage from "./pages/HomePage";
-import ChatPage from "./pages/ChatPage";
 import ProtectedLayout from "./components/global/ProtectedLayout";
+import ManageModules from "./pages/ManageModules";
 
 function App() {
   // Modal state for global feedback
@@ -86,8 +86,15 @@ function App() {
             }
           >
             {/* Add more routes that req auth here */}
-            <Route path="/home" element={<HomePage user={auth.user} />} />
-            <Route path="/chat/:id" element={<ChatPage />} />
+            <Route
+              path="/home"
+              element={<HomePage user={auth.user} setModal={setModal} />}
+            />
+            {/* <Route path="/chat/:id" element={<ChatPage />} /> */}
+            <Route
+              path="/manage-modules"
+              element={<ManageModules user={auth.user} setModal={setModal} />}
+            />
           </Route>
         </Routes>
       </main>
