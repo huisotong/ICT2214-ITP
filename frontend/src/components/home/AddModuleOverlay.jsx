@@ -1,54 +1,71 @@
 import { useState } from "react";
 
 export default function AddModuleOverlay({ user, onClose, setModal }) {
-  const [moduleName, setModuleName] = useState("");
+  const [moduleParams, setModuleParams] = useState({
+    id: "",
+    name: "",
+    description: "",
+  });
   const [credit, setCredit] = useState("");
   const [csvFile, setCsvFile] = useState(null);
 
-  // Enable button only if moduleName and credit are filled
-  const isDisabled = !moduleName.trim() || !credit.trim();
+  // Enable button only if required fields are filled
+  const isDisabled =
+    !moduleParams.id.trim() || !moduleParams.name.trim() || !credit.trim();
+
+  const handleModuleParamChange = (e) => {
+    const { name, value } = e.target;
+    setModuleParams((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
 
   async function handleSubmit(e) {
     e.preventDefault();
     if (isDisabled) return;
 
     const formData = new FormData();
-    formData.append("moduleName", moduleName);
-    formData.append("moduleOwner", user.name);
+    formData.append("userID", user.userID);
+    formData.append("moduleID", moduleParams.id);
+    formData.append("moduleName", moduleParams.name);
+    formData.append("moduleDescription", moduleParams.description);
     formData.append("initialCredit", credit);
     if (csvFile) {
       formData.append("csvFile", csvFile);
     }
 
     try {
-      const response = await fetch("http://localhost:5000/api/addModule", {
+      const response = await fetch("http://localhost:5000/api/add-module", {
         method: "POST",
         body: formData,
       });
+
+      const data = await response.json();
 
       if (!response.ok) {
         setModal({
           active: true,
           type: "fail",
-          message: "Failed to add module. Please try again.",
+          message: `Failed to create module`,
         });
         onClose();
-        return;
       }
 
-      const data = await response.json();
+      // Show success message
       setModal({
         active: true,
         type: "success",
-        message: `Module ${data.moduleName} added successfully!`,
+        message: `Module ${moduleParams.name} created successfully!`,
       });
-      // refresh page maybe
       onClose();
+      window.location.reload();
     } catch (error) {
+      console.error("Error creating module:", error);
       setModal({
         active: true,
         type: "fail",
-        message: "Failed to add module. Please try again.",
+        message: `Failed to create module`,
       });
       onClose();
     }
@@ -60,11 +77,34 @@ export default function AddModuleOverlay({ user, onClose, setModal }) {
         <h2 className="text-xl font-bold mb-4 border-b pb-2">Add Module</h2>
         <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
           <div>
+            <label className="block font-semibold mb-1">Module ID</label>
+            <input
+              className="w-full border-2 rounded px-2 py-1"
+              name="id"
+              value={moduleParams.id}
+              onChange={handleModuleParamChange}
+              required
+            />
+          </div>
+          <div>
             <label className="block font-semibold mb-1">Module Name</label>
             <input
               className="w-full border-2 rounded px-2 py-1"
-              value={moduleName}
-              onChange={(e) => setModuleName(e.target.value)}
+              name="name"
+              value={moduleParams.name}
+              onChange={handleModuleParamChange}
+              required
+            />
+          </div>
+          <div>
+            <label className="block font-semibold mb-1">
+              Module Description
+            </label>
+            <input
+              className="w-full border-2 rounded px-2 py-1"
+              name="description"
+              value={moduleParams.description}
+              onChange={handleModuleParamChange}
               required
             />
           </div>

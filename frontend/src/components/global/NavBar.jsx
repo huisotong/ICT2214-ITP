@@ -64,9 +64,6 @@ export default function NavBar({ user }) {
             <span className="font-semibold text-black">
               {user?.name || "NAME XX XXX XXX"}
             </span>
-            <span className="text-xs text-gray-600">
-              Credits: {user?.credits ?? "--"}
-            </span>
           </div>
           <span
             className="ml-1 text-xl transition-transform duration-200"

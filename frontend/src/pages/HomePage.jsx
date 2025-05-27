@@ -1,37 +1,24 @@
 import { useEffect, useState } from "react";
 import Modules from "../components/home/Modules";
 import AddModuleOverlay from "../components/home/AddModuleOverlay";
+import { fetchAssignedModules } from "../../utils/fetchAssignedModules";
 
 function HomePage({ user, setModal }) {
   const [modules, setModules] = useState([]);
   const [toggleAddModule, setToggleAddModule] = useState(false);
 
-  // fetch modules for a user
-  async function fetchModules() {
-    try {
-      const response = await fetch(
-        `http://localhost:5000/api/get-assigned-modules?userId=${user.id}`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch modules");
-      }
-
-      const data = await response.json();
-      setModules(data);
-    } catch (error) {
-      console.error("Error fetching modules:", error);
-    }
+  async function fetchUserAssignedModules() {
+    await fetchAssignedModules(13) // change to userid later
+      .then((data) => {
+        setModules(data);
+      })
+      .catch((error) => {
+        console.error("Error fetching assigned modules:", error);
+      });
   }
 
   useEffect(() => {
-    fetchModules();
+    fetchUserAssignedModules();
   }, []);
 
   return (
