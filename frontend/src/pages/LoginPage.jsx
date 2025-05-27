@@ -1,23 +1,18 @@
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { validateEmail } from "../../utils/helper";
-import Input from "../components/global/Input";
-import styles from "../styles/global.module.css";
+import Input from "../components/global/Input"; // Reusable Input should also use Tailwind
 
 function LoginPage() {
   const navigate = useNavigate();
 
-  // Form state
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
-  // Error handling state
   const [error, setError] = useState("");
 
   const handleLogin = (e) => {
     e.preventDefault();
 
-    // Input validation
     if (!email || !password) {
       setError("Email and password cannot be empty");
       return;
@@ -28,7 +23,6 @@ function LoginPage() {
       return;
     }
 
-    // Hardcoded credentials
     const validEmail = "student@sit.singaporetech.edu.sg";
     const validPassword = "123456";
 
@@ -36,7 +30,6 @@ function LoginPage() {
       const fakeToken = "abc123";
       const fakeUser = { email };
 
-      // Store user info in sessionStorage
       sessionStorage.setItem("token", fakeToken);
       sessionStorage.setItem("user", JSON.stringify(fakeUser));
 
@@ -48,29 +41,36 @@ function LoginPage() {
   };
 
   return (
-    <div className={styles.loginContainer}>
-      <h1 className={styles.loginTitle}>Login Page</h1>
-      <form onSubmit={handleLogin}>
-        <Input
-          label="Email"
-          type="email"
-          placeholder="Enter your email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <Input
-          label="Password"
-          type="password"
-          placeholder="Enter your password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <button type="submit" className={styles.loginButton}>
-          Log In
-        </button>
-      </form>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 px-4">
+      <div className="w-full max-w-md p-6 bg-white rounded shadow-md">
+        <h1 className="text-2xl font-bold mb-6 text-center">Login Page</h1>
+        <form onSubmit={handleLogin} className="space-y-4">
+          <Input
+            label="Email is student@sit.singaporetech.edu.sg"
+            type="email"
+            placeholder="Enter your email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <Input
+            label="Password is 123456"
+            type="password"
+            placeholder="Enter your password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <button
+            type="submit"
+            className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
+          >
+            Log In
+          </button>
+        </form>
 
-      {error && <div className={styles.loginError}>{error}</div>}
+        {error && (
+          <div className="mt-4 text-red-600 text-sm text-center">{error}</div>
+        )}
+      </div>
     </div>
   );
 }
