@@ -3,6 +3,7 @@ import { Routes, Route } from "react-router-dom";
 
 // Import styles and components
 import styles from "./styles/global.module.css";
+import "./styles/App.css";
 import Modal from "./components/global/Modal";
 import PrivateRoute from "./components/global/PrivateRoute";
 
@@ -11,7 +12,6 @@ import LoginPage from "./pages/LoginPage";
 import HomePage from "./pages/HomePage";
 
 function App() {
-
   // Modal state for global feedback
   const [modal, setModal] = useState({
     active: false,
@@ -21,8 +21,8 @@ function App() {
 
   // Authentication state
   const [auth, setAuth] = useState({
-    isAuthenticated: true, 
-    token: "dfsdfsdf",      
+    isAuthenticated: true,
+    token: "dfsdfsdf",
     user: null,
   });
 
@@ -48,12 +48,12 @@ function App() {
 
   // Perform authentication check once when app loads
   useEffect(() => {
-    const token = "fsdf"; 
+    const token = "fsdf";
 
     if (token) {
       fetchUser(token);
     } else {
-      setIsAuthChecked(true); 
+      setIsAuthChecked(true);
     }
   }, [isAuthChecked]);
 
