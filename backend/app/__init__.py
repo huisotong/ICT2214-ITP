@@ -5,6 +5,7 @@ import os
 from .routes.credits_bp import credits_bp
 from .routes.users_bp import users_bp
 from .routes.modules_bp import modules_bp
+from .routes.credit_requests_bp import credit_requests_bp
 from sqlalchemy import text
 
 # Initialise app
@@ -21,6 +22,7 @@ def create_app():
     app.register_blueprint(credits_bp, url_prefix='/api')
     app.register_blueprint(users_bp, url_prefix='/api')
     app.register_blueprint(modules_bp, url_prefix='/api')
+    app.register_blueprint(credit_requests_bp, url_prefix='/api')
 
     # Test database connection
     with app.app_context():
