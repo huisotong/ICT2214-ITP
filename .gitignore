@@ -22,6 +22,9 @@ dist-ssr
 *.sln
 *.sw?
 
+#venv
+backend/venv/
+
 
 # Environment Variables
 .env

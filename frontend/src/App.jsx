@@ -10,8 +10,9 @@ import PrivateRoute from "./components/global/PrivateRoute";
 // Import pages
 import LoginPage from "./pages/LoginPage";
 import HomePage from "./pages/HomePage";
-import ProtectedLayout from "./components/global/ProtectedLayout";
 import ManageModules from "./pages/ManageModules";
+import ManageCreditRequests from "./pages/ManageCreditRequests"; // Import the new page
+import ProtectedLayout from "./components/global/ProtectedLayout";
 
 function App() {
   // Modal state for global feedback
@@ -94,6 +95,11 @@ function App() {
             <Route
               path="/manage-modules"
               element={<ManageModules user={auth.user} setModal={setModal} />}
+            />
+            {/* Add the new route below */}
+            <Route
+              path="/manage-credit-requests"
+              element={<ManageCreditRequests user={auth.user} setModal={setModal} />}
             />
           </Route>
         </Routes>
