@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Tooltip from "../components/global/Tooltip";
 import styles from "../styles/global.module.css";
 
 // Mock data for chats and models
@@ -193,6 +194,9 @@ function ChatPage() {
               <div style={{ marginBottom: 16 }}>
                 <label>
                   <strong>Temperature</strong>
+                  <Tooltip
+                      content={`Controls randomness. Lower temperature results in less random completions. As the temperature approaches zero, the model will become deterministic and repetitive. Higher temperature results in more random completions.`}
+                  />
                   <input
                     type="range"
                     min={0}
@@ -208,6 +212,9 @@ function ChatPage() {
               <div style={{ marginBottom: 16 }}>
                 <label>
                   <strong>Top P</strong>
+                  <Tooltip
+                      content={`Controls diversity via nucleus sampling: 0.5 means half of all likelihood-weighted options are considered.`}
+                  />
                   <input
                     type="range"
                     min={0}
@@ -223,6 +230,9 @@ function ChatPage() {
               <div style={{ marginBottom: 16 }}>
                 <label>
                   <strong>Presence Penalty</strong>
+                  <Tooltip
+                      content={`Applies a penalty to the log-probability of tokens already in the text.`}
+                  />
                   <input
                     type="range"
                     min={0}
@@ -238,6 +248,9 @@ function ChatPage() {
               <div>
                 <label>
                   <strong>Frequency Penalty</strong>
+                  <Tooltip
+                      content={`Applies a penalty to the log-probability of tokens that appear in the text.`}
+                  />
                   <input
                     type="range"
                     min={0}
