@@ -26,24 +26,26 @@ function App() {
   // Authentication state
   const [auth, setAuth] = useState({
     isAuthenticated: true,
-    token: "dfsdfsdf",
-    user: {
-      role: "admin",
-      name: "testadmin",
-      profilePicture: "/profilepic.png",
-      credits: 1000,
-    },
+    user: null,
   });
 
   // Prevent rendering until authentication check completes
   const [isAuthChecked, setIsAuthChecked] = useState(false);
 
-  // Simulated fetch to get user profile using token
-  async function fetchUser(token) {
-    console.log("Fetching user profile...");
-    // TODO: Replace with real API request
+  // Simulated auth fetch from sessionStorage
+  useEffect(() => {
+    const userFromStorage = sessionStorage.getItem("user");
+
+    if (userFromStorage) {
+      const parsedUser = JSON.parse(userFromStorage);
+      setAuth({
+        isAuthenticated: true,
+        user: parsedUser,
+      });
+    }
+
     setIsAuthChecked(true);
-  }
+  }, []);
 
   // Auto-close modal after 3 seconds
   useEffect(() => {
@@ -54,17 +56,6 @@ function App() {
       return () => clearTimeout(timeout);
     }
   }, [modal]);
-
-  // Perform authentication check once when app loads
-  useEffect(() => {
-    const token = "fsdf";
-
-    if (token) {
-      fetchUser(token);
-    } else {
-      setIsAuthChecked(true);
-    }
-  }, [isAuthChecked]);
 
   // Show loading screen while checking authentication
   if (!isAuthChecked) {

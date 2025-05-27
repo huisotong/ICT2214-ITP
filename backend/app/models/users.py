@@ -5,16 +5,9 @@ class User(db.Model):
     __table_args__ = {'schema': 'dbo'}
 
     userID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(255), nullable=False)
     email = db.Column(db.String(255), nullable=False)
     password = db.Column(db.String(255), nullable=False)
     mobileNumber = db.Column(db.String(20), nullable=True)
-    Role = db.Column(db.String(10), nullable=False)
-
-    def to_dict(self):
-        return {
-            "userID": self.userID,
-            "email": self.email,
-            "mobileNumber": self.mobileNumber,
-            "Role": self.Role
-            # ⚠️ Do not include password here for security!
-        }
+    role = db.Column(db.String(10), nullable=False)
+    studentID = db.Column(db.Integer, nullable=True)

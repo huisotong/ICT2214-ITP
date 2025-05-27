@@ -10,7 +10,7 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
 
     if (!email || !password) {
@@ -23,20 +23,28 @@ function LoginPage() {
       return;
     }
 
-    const validEmail = "student@sit.singaporetech.edu.sg";
-    const validPassword = "123456";
+    try {
+      const response = await fetch("http://localhost:5000/api/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-    if (email === validEmail && password === validPassword) {
-      const fakeToken = "abc123";
-      const fakeUser = { email };
+      const data = await response.json();
 
-      sessionStorage.setItem("token", fakeToken);
-      sessionStorage.setItem("user", JSON.stringify(fakeUser));
+      if (response.ok) {
+        sessionStorage.setItem("user", JSON.stringify(data.user));
 
-      setError("");
-      navigate("/home");
-    } else {
-      setError("Invalid email or password");
+        setError("");
+        navigate("/home");
+      } else {
+        setError(data.error || "Login failed");
+      }
+    } catch (err) {
+      console.error("Login error:", err);
+      setError("An error occurred while trying to log in");
     }
   };
 
