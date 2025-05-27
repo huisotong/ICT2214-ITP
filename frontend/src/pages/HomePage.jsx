@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import Modules from "../components/home/Modules";
 import AddModuleOverlay from "../components/home/AddModuleOverlay";
 
-function HomePage({ user }) {
+function HomePage({ user, setModal }) {
   const [modules, setModules] = useState([]);
   const [toggleAddModule, setToggleAddModule] = useState(false);
 
@@ -31,6 +31,7 @@ function HomePage({ user }) {
         <AddModuleOverlay
           user={user}
           onClose={() => setToggleAddModule(false)}
+          setModal={setModal}
         />
       )}
       <div className={`${toggleAddModule ? "blur-xs" : ""} transition-all`}>

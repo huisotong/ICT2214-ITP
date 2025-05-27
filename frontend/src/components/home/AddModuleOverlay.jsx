@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-export default function AddModuleOverlay({ user, onClose }) {
+export default function AddModuleOverlay({ user, onClose, setModal }) {
   const [moduleName, setModuleName] = useState("");
   const [credit, setCredit] = useState("");
   const [csvFile, setCsvFile] = useState(null);
@@ -8,11 +8,50 @@ export default function AddModuleOverlay({ user, onClose }) {
   // Enable button only if moduleName and credit are filled
   const isDisabled = !moduleName.trim() || !credit.trim();
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     if (isDisabled) return;
-    // logic to create module here
-    onClose();
+
+    const formData = new FormData();
+    formData.append("moduleName", moduleName);
+    formData.append("moduleOwner", user.name);
+    formData.append("initialCredit", credit);
+    if (csvFile) {
+      formData.append("csvFile", csvFile);
+    }
+
+    try {
+      const response = await fetch("http://localhost:5000/api/addModule", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        setModal({
+          active: true,
+          type: "fail",
+          message: "Failed to add module. Please try again.",
+        });
+        onClose();
+        return;
+      }
+
+      const data = await response.json();
+      setModal({
+        active: true,
+        type: "success",
+        message: `Module ${data.moduleName} added successfully!`,
+      });
+      // refresh page maybe
+      onClose();
+    } catch (error) {
+      setModal({
+        active: true,
+        type: "fail",
+        message: "Failed to add module. Please try again.",
+      });
+      onClose();
+    }
   }
 
   return (

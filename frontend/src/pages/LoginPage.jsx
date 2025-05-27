@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { validateEmail } from "../../utils/helper";
-import Input from "../components/global/Input"; // Reusable Input should also use Tailwind
+import Input from "../components/login/Input"; // Reusable Input should also use Tailwind
 
 function LoginPage() {
   const navigate = useNavigate();
