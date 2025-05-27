@@ -10,6 +10,7 @@ import PrivateRoute from "./components/global/PrivateRoute";
 // Import pages
 import LoginPage from "./pages/LoginPage";
 import HomePage from "./pages/HomePage";
+import ChatPage from "./pages/ChatPage";
 import ProtectedLayout from "./components/global/ProtectedLayout";
 
 function App() {
@@ -86,6 +87,7 @@ function App() {
           >
             {/* Add more routes that req auth here */}
             <Route path="/home" element={<HomePage user={auth.user} />} />
+            <Route path="/chat/:id" element={<ChatPage />} />
           </Route>
         </Routes>
       </main>
