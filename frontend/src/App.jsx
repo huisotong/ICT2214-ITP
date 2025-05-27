@@ -25,14 +25,14 @@ function App() {
 
   // Authentication state
   const [auth, setAuth] = useState({
-    isAuthenticated: true,
+    isAuthenticated: false,
     user: null,
   });
 
   // Prevent rendering until authentication check completes
   const [isAuthChecked, setIsAuthChecked] = useState(false);
 
-  // Simulated auth fetch from sessionStorage
+  // Fetch user from sessionStorage if exists
   useEffect(() => {
     const userFromStorage = sessionStorage.getItem("user");
 
@@ -70,7 +70,7 @@ function App() {
       {/* Main App Content */}
       <main className={styles.main}>
         <Routes>
-          <Route path="/" element={<LoginPage />} />
+          <Route path="/" element={<LoginPage setAuth={setAuth} />} />
           <Route
             element={
               <PrivateRoute isAuthenticated={auth.isAuthenticated}>

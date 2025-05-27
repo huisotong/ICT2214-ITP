@@ -3,7 +3,7 @@ import { useState } from "react";
 import { validateEmail } from "../../utils/helper";
 import Input from "../components/login/Input"; // Reusable Input should also use Tailwind
 
-function LoginPage() {
+function LoginPage({ setAuth }) {
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
@@ -36,6 +36,12 @@ function LoginPage() {
 
       if (response.ok) {
         sessionStorage.setItem("user", JSON.stringify(data.user));
+
+        // Set auth state in parent App.jsx
+        setAuth({
+          isAuthenticated: true,
+          user: data.user,
+        });
 
         setError("");
         navigate("/home");
