@@ -32,7 +32,7 @@ export default function NavBar({ user }) {
         >
           Home
         </a>
-        {user?.role === "admin" && (
+        {user?.role === "Admin" && (
           <>
             <a
               href="/manage-modules"
