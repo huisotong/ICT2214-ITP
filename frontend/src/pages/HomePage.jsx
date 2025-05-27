@@ -8,7 +8,7 @@ function HomePage({ user, setModal }) {
   const [toggleAddModule, setToggleAddModule] = useState(false);
 
   async function fetchUserAssignedModules() {
-    await fetchAssignedModules(13) // change to userid later
+    await fetchAssignedModules(user.userID)
       .then((data) => {
         setModules(data);
       })
@@ -39,7 +39,7 @@ function HomePage({ user, setModal }) {
         <div className="flex flex-col justify-center items-center w-full">
           <div className="flex justify-between items-center w-11/12 h-14">
             <p className="font-bold">My Modules</p>
-            {user.role === "admin" && (
+            {user.role === "Admin" && (
               <button
                 onClick={() => setToggleAddModule(true)}
                 className="font-bold cursor-pointer border-2 p-2 rounded-lg bg-blue-300 hover:bg-blue-400 transition"

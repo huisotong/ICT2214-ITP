@@ -47,25 +47,30 @@ export default function AddModuleOverlay({ user, onClose, setModal }) {
         setModal({
           active: true,
           type: "fail",
-          message: `Failed to create module`,
+          message: data.error || "Failed to create module",
         });
         onClose();
+        return;
       }
 
-      // Show success message
+      // Construct success message including warnings if any
+      let successMessage = `Module ${moduleParams.name} created successfully! Please refresh the page to see the changes.`;
+      if (data.warnings) {
+        successMessage += `\n\n${data.warnings}`;
+      }
+
       setModal({
         active: true,
         type: "success",
-        message: `Module ${moduleParams.name} created successfully!`,
+        message: successMessage,
       });
       onClose();
-      window.location.reload();
     } catch (error) {
       console.error("Error creating module:", error);
       setModal({
         active: true,
         type: "fail",
-        message: `Failed to create module`,
+        message: "Failed to create module. Please try again.",
       });
       onClose();
     }
@@ -137,8 +142,15 @@ export default function AddModuleOverlay({ user, onClose, setModal }) {
               accept=".csv"
               onChange={(e) => setCsvFile(e.target.files[0])}
             />
-            <div className="text-xs text-gray-600">
-              Format of csv file should follow lorum ipsum dolor amet
+            <div className="text-sm text-gray-600">
+              Format of csv file should follow this
+              <a
+                href="/template.csv"
+                download
+                className="text-blue-600 hover:text-blue-800 underline mx-1"
+              >
+                template
+              </a>
             </div>
           </div>
           <div className="flex justify-between mt-4">

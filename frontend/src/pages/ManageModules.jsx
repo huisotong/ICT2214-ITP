@@ -2,45 +2,90 @@ import { useState, useEffect } from "react";
 import ModuleSettings from "../components/manage-modules/ModuleSettings";
 import LLMSettings from "../components/manage-modules/LLMSettings";
 import ManageStudents from "../components/manage-modules/ManageStudents";
+import { fetchAssignedModules } from "../../utils/fetchAssignedModules";
 
 export default function ManageModules({ user, setModal }) {
   const [modules, setModules] = useState([]);
   const [selectedModule, setSelectedModule] = useState(null);
   const [moduleSettings, setModuleSettings] = useState({
+    moduleID: "",
     moduleName: "",
     moduleDesc: "",
   });
 
-  async function fetchModules() {
-    // TODO: Replace with actual API call
-    setModules([
-      {
-        id: 1,
-        moduleName: "ICT2116-Secure Software Development",
-        moduleDesc: "Description for Module 1",
-      },
-      { id: 2, moduleName: "ICT1002", moduleDesc: "Description for Module 2" },
-      { id: 3, moduleName: "ICT1003", moduleDesc: "Description for Module 3" },
-    ]);
+  async function fetchUserAssignedModules() {
+    await fetchAssignedModules(user.userID)
+      .then((data) => {
+        setModules(data);
+      })
+      .catch((error) => {
+        console.error("Error fetching assigned modules:", error);
+      });
   }
 
   async function handleModuleSelect(moduleId) {
-    const selected = modules.find((m) => m.id === parseInt(moduleId));
+    const selected = modules.find((m) => m.moduleID === moduleId);
     setSelectedModule(selected);
     if (selected) {
       setModuleSettings({
+        moduleID: selected.moduleID,
         moduleName: selected.moduleName,
         moduleDesc: selected.moduleDesc,
       });
     }
   }
 
-  function deleteModule(moduleId) {
-    return;
+  async function deleteModule(moduleId) {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete module ${moduleId}? This action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/delete-module`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ moduleID: moduleId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to delete module");
+      }
+
+      // Show success message
+      setModal({
+        active: true,
+        type: "success",
+        message: `Module ${moduleId} deleted successfully!`,
+      });
+
+      // Reset selected module and refresh module list
+      setSelectedModule(null);
+      setModuleSettings({
+        moduleID: "",
+        moduleName: "",
+        moduleDesc: "",
+      });
+      await fetchUserAssignedModules();
+    } catch (error) {
+      console.error("Error deleting module:", error);
+      setModal({
+        active: true,
+        type: "fail",
+        message: error.message || "Failed to delete module. Please try again.",
+      });
+    }
   }
 
   useEffect(() => {
-    fetchModules();
+    fetchUserAssignedModules();
   }, []);
 
   return (
@@ -50,12 +95,12 @@ export default function ManageModules({ user, setModal }) {
         <select
           className="p-2 border rounded cursor-pointer h-10"
           onChange={(e) => handleModuleSelect(e.target.value)}
-          value={selectedModule?.id || ""}
+          value={selectedModule?.moduleID || ""}
         >
           <option value="">Select a module</option>
           {modules.map((module) => (
-            <option key={module.id} value={module.id}>
-              {module.moduleName}
+            <option key={module.moduleID} value={module.moduleID}>
+              {`${module.moduleID} - ${module.moduleName}`}
             </option>
           ))}
         </select>
@@ -63,7 +108,7 @@ export default function ManageModules({ user, setModal }) {
           <button
             className="bg-red-500 h-10 text-white px-4 py-2 rounded cursor-pointer hover:bg-red-600 transition"
             onClick={() => {
-              deleteModule(selectedModule.id);
+              deleteModule(selectedModule.moduleID);
             }}
           >
             Delete Module
