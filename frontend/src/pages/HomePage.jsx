@@ -8,17 +8,26 @@ function HomePage({ user, setModal }) {
 
   // fetch modules for a user
   async function fetchModules() {
-    // for now
-    setModules([
-      { id: 1, moduleName: "ICT1001", moduleDesc: "Description for Module 1" },
-      { id: 2, moduleName: "ICT1002", moduleDesc: "Description for Module 2" },
-      { id: 3, moduleName: "ICT1003", moduleDesc: "Description for Module 3" },
-      { id: 4, moduleName: "ICT1004", moduleDesc: "Description for Module 4" },
-      { id: 5, moduleName: "ICT1005", moduleDesc: "Description for Module 5" },
-      { id: 6, moduleName: "ICT1006", moduleDesc: "Description for Module 6" },
-      { id: 7, moduleName: "ICT1007", moduleDesc: "Description for Module 7" },
-      { id: 8, moduleName: "ICT1008", moduleDesc: "Description for Module 8" },
-    ]);
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/get-assigned-modules?userId=${user.id}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch modules");
+      }
+
+      const data = await response.json();
+      setModules(data);
+    } catch (error) {
+      console.error("Error fetching modules:", error);
+    }
   }
 
   useEffect(() => {
@@ -34,11 +43,13 @@ function HomePage({ user, setModal }) {
           setModal={setModal}
         />
       )}
-      <div className={`${toggleAddModule ? "blur-xs" : ""} transition-all`}>
+      <div
+        className={`${toggleAddModule ? "blur-xs" : ""} transition-all w-full`}
+      >
         <div className="flex justify-center items-center h-12">
           <h1>Welcome, {user.name}!</h1>
         </div>
-        <div className="flex flex-col justify-center items-center">
+        <div className="flex flex-col justify-center items-center w-full">
           <div className="flex justify-between items-center w-11/12 h-14">
             <p className="font-bold">My Modules</p>
             {user.role === "admin" && (
