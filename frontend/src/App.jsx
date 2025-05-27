@@ -10,6 +10,7 @@ import PrivateRoute from "./components/global/PrivateRoute";
 // Import pages
 import LoginPage from "./pages/LoginPage";
 import HomePage from "./pages/HomePage";
+import NavBar from "./components/global/NavBar";
 
 function App() {
   // Modal state for global feedback
@@ -23,7 +24,12 @@ function App() {
   const [auth, setAuth] = useState({
     isAuthenticated: true,
     token: "dfsdfsdf",
-    user: null,
+    user: {
+      role: "admin",
+      name: "testadmin",
+      profilePicture: "/profilepic.png",
+      credits: 1000,
+    },
   });
 
   // Prevent rendering until authentication check completes
@@ -75,7 +81,7 @@ function App() {
             path="/home"
             element={
               <PrivateRoute isAuthenticated={auth.isAuthenticated}>
-                {/* Uncomment and add <NavBar /> here if needed in future */}
+                <NavBar user={auth.user} />
                 <HomePage />
               </PrivateRoute>
             }
