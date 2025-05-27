@@ -82,7 +82,7 @@ function App() {
             element={
               <PrivateRoute isAuthenticated={auth.isAuthenticated}>
                 <NavBar user={auth.user} />
-                <HomePage />
+                <HomePage user={auth.user} />
               </PrivateRoute>
             }
           />

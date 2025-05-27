@@ -1,6 +1,5 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
-  FaChevronUp,
   FaChevronDown,
   FaUserCircle,
   FaSignOutAlt,
@@ -28,7 +27,7 @@ export default function NavBar({ user }) {
       <div className="flex items-center gap-4">
         <img src="/sit_logo.png" alt="SIT Logo" className="h-12 w-auto" />
         <a
-          href="/"
+          href="/home"
           className="flex items-center gap-1 font-semibold text-lg text-black hover:text-sit-orange"
         >
           Home
