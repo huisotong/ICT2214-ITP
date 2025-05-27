@@ -38,6 +38,77 @@
   background-color: #4ade80;
 }
 
+/** Input Box Styles **/
+.inputContainer {
+  margin-bottom: 1rem;
+}
+
+.inputLabel {
+  font-size: 13px;
+  color: #334155; /* slate-800 equivalent */
+  display: block;
+  margin-bottom: 4px;
+}
+
+.inputBox {
+  display: flex;
+  align-items: center;
+  border: 1px solid #ccc;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background-color: white;
+}
+
+.inputField {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 14px;
+}
+
+.inputIcon {
+  cursor: pointer;
+  color: #888;
+}
+
+/** Login Styles **/
+.loginContainer {
+  padding: 2rem;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.loginTitle {
+  margin-bottom: 1.5rem;
+  font-size: 24px;
+  text-align: center;
+}
+
+.loginButton {
+  width: 100%;
+  padding: 10px;
+  margin-top: 1rem;
+  background-color: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.loginButton:hover {
+  background-color: #357ab8;
+}
+
+.loginError {
+  margin-top: 1rem;
+  color: red;
+  font-size: 14px;
+  text-align: center;
+}
+
+
 @media (min-width: 768px) {
   .modalbox {
     width: 91.666667%;

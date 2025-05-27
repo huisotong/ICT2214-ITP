@@ -1,62 +1,73 @@
 import { useState, useEffect } from "react";
-import styles from "./styles/global.module.css";
-import Modal from "./components/global/Modal";
-import LoginPage from "./pages/LoginPage";
-import HomePage from "./pages/HomePage";
-import PrivateRoute from "./components/global/PrivateRoute";
 import { Routes, Route } from "react-router-dom";
 
+// Import styles and components
+import styles from "./styles/global.module.css";
+import Modal from "./components/global/Modal";
+import PrivateRoute from "./components/global/PrivateRoute";
+
+// Import pages
+import LoginPage from "./pages/LoginPage";
+import HomePage from "./pages/HomePage";
+
 function App() {
-  // Set up global modal
+
+  // Modal state for global feedback
   const [modal, setModal] = useState({
     active: false,
     type: "fail",
     message: "",
   });
 
-  // Authenticate user based off token (all set to true for now since login is hard coded)
+  // Authentication state
   const [auth, setAuth] = useState({
-    isAuthenticated: true,
-    token: "dfsdfsdf",
+    isAuthenticated: true, 
+    token: "dfsdfsdf",      
     user: null,
   });
+
+  // Prevent rendering until authentication check completes
   const [isAuthChecked, setIsAuthChecked] = useState(false);
 
-  // Fetch user profile with token
+  // Simulated fetch to get user profile using token
   async function fetchUser(token) {
-    console.log("fetching user");
+    console.log("Fetching user profile...");
+    // TODO: Replace with real API request
     setIsAuthChecked(true);
-
-    // fetch request to get user data
   }
 
-  // Turn off modal if it activates after 3 seconds
+  // Auto-close modal after 3 seconds
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      setModal({ active: false, type: "fail", message: "" });
-    }, 3000);
-    return () => clearTimeout(timeout);
+    if (modal.active) {
+      const timeout = setTimeout(() => {
+        setModal({ active: false, type: "fail", message: "" });
+      }, 3000);
+      return () => clearTimeout(timeout);
+    }
   }, [modal]);
 
-  // Fetch user on every new page rendered to see if authenticated (use in future if we wan do)
+  // Perform authentication check once when app loads
   useEffect(() => {
-    const token = "fsdf";
+    const token = "fsdf"; 
 
     if (token) {
       fetchUser(token);
     } else {
-      setIsAuthChecked(true);
+      setIsAuthChecked(true); 
     }
   }, [isAuthChecked]);
 
+  // Show loading screen while checking authentication
   if (!isAuthChecked) {
-    // Prevent any route rendering until auth is checked
     return <div className={styles.main}>Loading...</div>;
   }
 
   return (
     <>
+      {/* Show global modal if active */}
       {modal.active && <Modal modal={modal} />}
+
+      {/* Main App Content */}
       <main className={styles.main}>
         <Routes>
           <Route path="/" element={<LoginPage />} />
@@ -64,7 +75,7 @@ function App() {
             path="/home"
             element={
               <PrivateRoute isAuthenticated={auth.isAuthenticated}>
-                {/* <NavBar />    for if got navbar in future */}
+                {/* Uncomment and add <NavBar /> here if needed in future */}
                 <HomePage />
               </PrivateRoute>
             }
