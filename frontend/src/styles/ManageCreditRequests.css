@@ -1,0 +1,45 @@
+.manage-requests-container {
+    padding: 20px;
+    font-family: sans-serif;
+  }
+  
+  .requests-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+  }
+  
+  .requests-table th,
+  .requests-table td {
+    border: 1px solid #ddd;
+    padding: 12px;
+    text-align: left;
+  }
+  
+  .requests-table th {
+    background-color: #f4f4f4;
+    font-weight: bold;
+  }
+  
+  .action-button {
+    padding: 8px 12px;
+    margin-right: 8px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    color: white;
+    font-weight: bold;
+  }
+  
+  .action-button.accept {
+    background-color: #4CAF50; /* Green */
+  }
+  
+  .action-button.reject {
+    background-color: #f44336; /* Red */
+  }
+  
+  .action-button:hover {
+    opacity: 0.9;
+  }
+  
