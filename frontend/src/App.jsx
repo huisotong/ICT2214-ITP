@@ -10,7 +10,7 @@ import PrivateRoute from "./components/global/PrivateRoute";
 // Import pages
 import LoginPage from "./pages/LoginPage";
 import HomePage from "./pages/HomePage";
-import NavBar from "./components/global/NavBar";
+import ProtectedLayout from "./components/global/ProtectedLayout";
 
 function App() {
   // Modal state for global feedback
@@ -80,9 +80,7 @@ function App() {
           <Route
             element={
               <PrivateRoute isAuthenticated={auth.isAuthenticated}>
-                {/* You can add <NavBar /> here if needed */}
-                <NavBar user={auth.user} />
-                <HomePage user={auth.user} />
+                <ProtectedLayout user={auth.user} />
               </PrivateRoute>
             }
           >
