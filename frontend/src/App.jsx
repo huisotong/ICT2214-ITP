@@ -78,14 +78,16 @@ function App() {
         <Routes>
           <Route path="/" element={<LoginPage />} />
           <Route
-            path="/home"
             element={
               <PrivateRoute isAuthenticated={auth.isAuthenticated}>
-                <NavBar user={auth.user} />
-                <HomePage user={auth.user} />
+                {/* You can add <NavBar /> here if needed */}
               </PrivateRoute>
             }
-          />
+          >
+            
+            {/* Add more routes that req auth here */}
+            <Route path="/home" element={<HomePage />} />
+          </Route>
         </Routes>
       </main>
     </>
