@@ -43,3 +43,31 @@
     opacity: 0.9;
   }
   
+  /* Tab Styles */
+.tabs-container {
+  margin-bottom: 20px;
+  display: flex;
+  border-bottom: 2px solid #ccc;
+}
+
+.tab-button {
+  padding: 10px 20px;
+  cursor: pointer;
+  border: none;
+  background-color: transparent;
+  font-size: 16px;
+  font-weight: bold;
+  color: #555;
+  transition: color 0.3s ease, border-bottom 0.3s ease;
+  margin-right: 5px; /* Spacing between tabs */
+  border-bottom: 3px solid transparent; /* For active indicator */
+}
+
+.tab-button:hover {
+  color: #007bff;
+}
+
+.tab-button.active {
+  color: #007bff;
+  border-bottom: 3px solid #007bff;
+}
