@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
 from app.models.users import User
+from app.db import db
 
 users_bp = Blueprint('users', __name__)
 
@@ -32,7 +33,8 @@ def get_user_by_id(user_id):
         "userID": user.userID,
         "email": user.email,
         "mobileNumber": user.mobileNumber,
-        "role": user.role
+        "role": user.role,
+        "name": user.name
     }), 200
 
 # 3. Login
@@ -62,3 +64,25 @@ def login():
             "studentID": user.studentID
         }
     }), 200
+
+# 4. Update user details
+@users_bp.route('/users/<int:user_id>', methods=['PUT'])
+def update_user(user_id):
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+
+    data = request.get_json()
+    print("Received update:", data)
+
+    user.name = data.get('name', user.name)
+    user.email = data.get('email', user.email)
+    user.mobileNumber = data.get('mobileNumber', user.mobileNumber)
+
+    try:
+        db.session.commit()
+        return jsonify({'message': 'User updated successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'Failed to update user details'}), 500
