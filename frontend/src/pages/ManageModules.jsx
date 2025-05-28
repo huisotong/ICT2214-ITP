@@ -3,8 +3,9 @@ import ModuleSettings from "../components/manage-modules/ModuleSettings";
 import LLMSettings from "../components/manage-modules/LLMSettings";
 import ManageStudents from "../components/manage-modules/ManageStudents";
 import { fetchAssignedModules } from "../../utils/fetchAssignedModules";
+import { useAuth } from "../context/AuthContext";
 
-export default function ManageModules({ user, setModal }) {
+export default function ManageModules({ setModal }) {
   const [modules, setModules] = useState([]);
   const [selectedModule, setSelectedModule] = useState(null);
   const [moduleSettings, setModuleSettings] = useState({
@@ -12,6 +13,10 @@ export default function ManageModules({ user, setModal }) {
     moduleName: "",
     moduleDesc: "",
   });
+
+  // Get User through Auth Context
+  const { auth } = useAuth();
+  const user = auth.user;
 
   async function fetchUserAssignedModules() {
     await fetchAssignedModules(user.userID)
