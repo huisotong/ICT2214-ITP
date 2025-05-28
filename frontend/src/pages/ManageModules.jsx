@@ -22,31 +22,17 @@ export default function ManageModules({ setModal }) {
   const [studentForm, setStudentForm] = useState({ name: "", studentID: "" });
   const [csvFile, setCsvFile] = useState(null);
 
-  // State to store students in selected module
-  const [studentsInModule, setStudentsInModule] = useState([]);
+  // This state is used to trigger ManageStudents to refresh its student list
+  const [refreshStudents, setRefreshStudents] = useState(0);
 
   async function fetchUserAssignedModules() {
     try {
       const data = await fetchAssignedModules(user.userID);
       setModules(data);
+      return data; // return fresh data for chaining
     } catch (error) {
       console.error("Error fetching assigned modules:", error);
-    }
-  }
-
-  async function fetchStudentsInModule(moduleId) {
-    if (!moduleId) {
-      setStudentsInModule([]);
-      return;
-    }
-    try {
-      const response = await fetch(`http://localhost:5000/api/students-in-module/${moduleId}`);
-      if (!response.ok) throw new Error("Failed to fetch students");
-      const data = await response.json();
-      setStudentsInModule(data);
-    } catch (error) {
-      console.error("Error fetching students in module:", error);
-      setStudentsInModule([]);
+      return [];
     }
   }
 
@@ -59,14 +45,14 @@ export default function ManageModules({ setModal }) {
         moduleName: selected.moduleName,
         moduleDesc: selected.moduleDesc,
       });
-      await fetchStudentsInModule(selected.moduleID);
-    } else {
-      setStudentsInModule([]);
+      // refreshStudents is changed below to cause ManageStudents to fetch students for this module
+      setRefreshStudents((prev) => prev + 1);
     }
   }
 
   async function deleteModule(moduleId) {
-    if (!window.confirm(`Are you sure you want to delete module ${moduleId}? This action cannot be undone.`)) return;
+    if (!window.confirm(`Are you sure you want to delete module ${moduleId}? This action cannot be undone.`))
+      return;
 
     try {
       const response = await fetch(`http://localhost:5000/api/delete-module`, {
@@ -83,31 +69,32 @@ export default function ManageModules({ setModal }) {
       setModal({ active: true, type: "success", message: `Module ${moduleId} deleted successfully!` });
       setSelectedModule(null);
       setModuleSettings({ moduleID: "", moduleName: "", moduleDesc: "" });
-      setStudentsInModule([]);
+      setRefreshStudents((prev) => prev + 1); // Refresh student list as module is deleted
       await fetchUserAssignedModules();
     } catch (error) {
       console.error("Error deleting module:", error);
       setModal({ active: true, type: "fail", message: error.message || "Failed to delete module." });
     }
   }
+
   async function handleDeleteAssignment(assignmentID) {
-  if (!window.confirm('Are you sure you want to remove this student from the module?')) return;
+    if (!window.confirm("Are you sure you want to remove this student from the module?")) return;
 
-  try {
-    const response = await fetch(`http://localhost:5000/api/delete-assignment/${assignmentID}`, {
-      method: 'DELETE',
-    });
+    try {
+      const response = await fetch(`http://localhost:5000/api/delete-assignment/${assignmentID}`, {
+        method: "DELETE",
+      });
 
-    if (!response.ok) throw new Error('Failed to delete student assignment');
+      if (!response.ok) throw new Error("Failed to delete student assignment");
 
-    setModal({ active: true, type: 'success', message: 'Student removed from module!' });
-    // Refresh student list
-    await fetchStudentsInModule(selectedModule.moduleID);
-  } catch (error) {
-    setModal({ active: true, type: 'fail', message: error.message });
+      setModal({ active: true, type: "success", message: "Student removed from module!" });
+
+      // Trigger ManageStudents to refresh the student list immediately
+      setRefreshStudents((prev) => prev + 1);
+    } catch (error) {
+      setModal({ active: true, type: "fail", message: error.message });
+    }
   }
-}
-
 
   async function handleSingleEnroll() {
     try {
@@ -122,7 +109,6 @@ export default function ManageModules({ setModal }) {
       });
 
       if (!response.ok) {
-        // Try to get detailed error message from backend
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to enroll student");
       }
@@ -131,12 +117,12 @@ export default function ManageModules({ setModal }) {
       setStudentForm({ name: "", studentID: "" });
       setShowPanel(false);
 
-      await fetchStudentsInModule(selectedModule.moduleID);
+      // Refresh students after enrolling one
+      setRefreshStudents((prev) => prev + 1);
     } catch (err) {
       setModal({ active: true, type: "fail", message: err.message });
     }
   }
-
 
   async function handleCsvUpload() {
     if (!csvFile) return;
@@ -156,10 +142,19 @@ export default function ManageModules({ setModal }) {
       setCsvFile(null);
       setShowPanel(false);
 
-      await fetchStudentsInModule(selectedModule.moduleID);
+      // Refresh students after CSV upload
+      setRefreshStudents((prev) => prev + 1);
     } catch (err) {
       setModal({ active: true, type: "fail", message: err.message });
     }
+  }
+
+  // Refresh modules list after a module edit
+  async function onModuleUpdated() {
+    const updatedModules = await fetchUserAssignedModules();
+    const updatedModule = updatedModules.find((m) => m.moduleID === moduleSettings.moduleID);
+    setSelectedModule(updatedModule || null);
+    setRefreshStudents((prev) => prev + 1); // Refresh students for the updated module
   }
 
   useEffect(() => {
@@ -195,12 +190,16 @@ export default function ManageModules({ setModal }) {
 
       {selectedModule && (
         <div className="flex flex-row justify-between items-start w-full h-screen gap-4">
-          {/* LEFT: Students list */}
-          <div className="w-1/2 border p-4 rounded max-h-full overflow-auto bg-white shadow">
-            <h3 className="font-semibold mb-2">Students in {selectedModule.moduleID}</h3>
-            
-            {/* Add Student button moved here */}
-            <div className="flex justify-end mb-2">
+          {/* LEFT: Students list handled by ManageStudents */}
+          <div className="w-1/2">
+            <ManageStudents
+              module={selectedModule}
+              setModal={setModal}
+              onDeleteAssignment={handleDeleteAssignment}
+              refreshTrigger={refreshStudents} // trigger to refetch students
+            />
+            {/* Add Student button */}
+            <div className="flex justify-end mt-2">
               <button
                 className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
                 onClick={() => setShowPanel(true)}
@@ -208,61 +207,16 @@ export default function ManageModules({ setModal }) {
                 + Add Student
               </button>
             </div>
-            
-            {studentsInModule.length > 0 ? (
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b">
-                    <th className="py-1 px-2">Student ID</th>
-                    <th className="py-1 px-2">Name</th>
-                    <th className="py-1 px-2">Email</th>
-                    <th className="py-1 px-2">Credits</th>
-                    <th className="py-1 px-2">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {studentsInModule.map((student) => (
-                    <tr key={student.assignmentID} className="border-b hover:bg-gray-100">
-                      <td className="py-1 px-2">{student.studentID}</td>
-                      <td className="py-1 px-2">{student.name}</td>
-                      <td className="py-1 px-2">{student.email}</td>
-                      <td className="py-1 px-2">{student.studentCredits}</td>
-                      <td className="py-1 px-2 flex gap-2">
-                        <button
-                          className="text-blue-600 hover:text-blue-800"
-                          title="Edit Student"
-                          onClick={() => alert(`Edit student: ${student.name}`)}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M11 5h6m-6 4h6m-6 4h6m-6 4h6" />
-                          </svg>
-                        </button>
-                        <button
-                          className="text-red-600 hover:text-red-800"
-                          title="Delete Student"
-                          onClick={() => handleDeleteAssignment(student.assignmentID)}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div className="p-4 text-gray-500">No students enrolled.</div>
-            )}
           </div>
 
-          {/*ModuleSettings and LLMSettings*/}
+          {/* ModuleSettings and LLMSettings */}
           <div className="w-1/2 flex flex-col justify-between items-center h-full overflow-auto space-y-6">
             <ModuleSettings
               module={selectedModule}
               setModal={setModal}
               moduleSettings={moduleSettings}
               setModuleSettings={setModuleSettings}
+              onModuleUpdated={onModuleUpdated}
             />
             <LLMSettings module={selectedModule} setModal={setModal} />
           </div>
