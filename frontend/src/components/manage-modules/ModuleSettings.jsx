@@ -5,6 +5,7 @@ export default function ModuleSettings({
   setModal,
   moduleSettings,
   setModuleSettings,
+  onModuleUpdated,  // added prop
 }) {
   async function handleSaveChanges() {
     try {
@@ -32,6 +33,10 @@ export default function ModuleSettings({
         type: "success",
         message: "Module settings updated successfully!",
       });
+
+      if (onModuleUpdated) {
+        await onModuleUpdated();
+      }
     } catch (error) {
       console.error("Error updating module settings:", error);
       setModal({

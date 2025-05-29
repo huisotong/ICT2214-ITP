@@ -1,4 +1,6 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, make_response
+from flask_jwt_extended import create_access_token, set_access_cookies, jwt_required, get_jwt_identity, unset_jwt_cookies
+from datetime import timedelta
 from app.models.users import User
 from app.db import db
 
@@ -53,7 +55,11 @@ def login():
     if not user:
         return jsonify({'error': 'Invalid email or password'}), 401
 
-    return jsonify({
+    # ✅ Generate JWT token valid for 1 day
+    access_token = create_access_token(identity=user.userID, expires_delta=timedelta(days=1))
+
+    # ✅ Create response with secure cookie
+    response = make_response(jsonify({
         "message": "Login successful",
         "user": {
             "userID": user.userID,
@@ -63,6 +69,34 @@ def login():
             "role": user.role,
             "studentID": user.studentID
         }
+    }))
+    set_access_cookies(response, access_token)
+    return response, 200
+
+# Route to securely log users out and unset their tokens (cant just brute force through URL)
+@users_bp.route('/logout', methods=['POST'])
+def logout():
+    response = jsonify({"message": "Logout successful"})
+    unset_jwt_cookies(response)
+    return response, 200
+
+# Route to fetch user details rather than use local storage
+@users_bp.route('/me', methods=['GET'])
+@jwt_required()
+def me():
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    return jsonify({
+        "userID": user.userID,
+        "name": user.name,
+        "email": user.email,
+        "mobileNumber": user.mobileNumber,
+        "role": user.role,
+        "studentID": user.studentID
     }), 200
 
 # 4. Update user details

@@ -1,10 +1,12 @@
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState , useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
 import { validateEmail } from "../../utils/helper";
-import Input from "../components/login/Input"; // Reusable Input should also use Tailwind
+import Input from "../components/login/Input";
 
-function LoginPage({ setAuth }) {
+function LoginPage() {
   const navigate = useNavigate();
+  const { setAuth } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -26,18 +28,14 @@ function LoginPage({ setAuth }) {
     try {
       const response = await fetch("http://localhost:5000/api/login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email, password }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        sessionStorage.setItem("user", JSON.stringify(data.user));
-
-        // Set auth state in parent App.jsx
         setAuth({
           isAuthenticated: true,
           user: data.user,
@@ -67,7 +65,7 @@ function LoginPage({ setAuth }) {
             onChange={(e) => setEmail(e.target.value)}
           />
           <Input
-            label="Password is 123456"
+            label="Password is teststudent"
             type="password"
             placeholder="Enter your password"
             value={password}

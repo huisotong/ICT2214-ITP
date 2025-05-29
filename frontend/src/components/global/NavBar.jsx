@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import {
   FaChevronDown,
   FaUserCircle,
@@ -6,7 +8,12 @@ import {
   FaRegCreditCard,
 } from "react-icons/fa";
 
-export default function NavBar({ user }) {
+export default function NavBar() {
+  // Get User through Auth Context
+  const { auth, setAuth } = useAuth();
+  const user = auth.user;
+  const navigate = useNavigate();
+
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -21,31 +28,46 @@ export default function NavBar({ user }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Secure logout handler
+  const handleLogout = async () => {
+    try {
+      await fetch("http://localhost:5000/api/logout", {
+        method: "POST",
+        credentials: "include", // 🔐 clear JWT cookie
+      });
+
+      setAuth({ isAuthenticated: false, user: null }); // clear frontend state
+      navigate("/"); // redirect to login
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
+
   return (
     <nav className="flex items-center justify-between bg-gray-200 px-6 py-2 shadow">
       {/* Left: Logo and Links */}
       <div className="flex items-center gap-4">
         <img src="/sit_logo.png" alt="SIT Logo" className="h-12 w-auto" />
-        <a
-          href="/home"
+        <Link
+          to="/home"
           className="flex items-center gap-1 font-semibold text-lg text-black hover:text-sit-orange"
         >
           Home
-        </a>
+        </Link>
         {user?.role === "Admin" && (
           <>
-            <a
-              href="/manage-modules"
+            <Link
+              to="/manage-modules"
               className="flex items-center gap-1 font-semibold text-lg text-black hover:text-sit-orange ml-4"
             >
               Manage Modules
-            </a>
-            <a
-              href="/manage-credit-requests"
+            </Link>
+            <Link
+              to="/manage-credit-requests"
               className="flex items-center gap-1 font-semibold text-lg text-black hover:text-sit-orange ml-4"
             >
               Manage Credit Requests
-            </a>
+            </Link>
           </>
         )}
       </div>
@@ -79,27 +101,26 @@ export default function NavBar({ user }) {
         {/* Dropdown */}
         {open && (
           <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-300 rounded shadow-lg z-50 animate-fade-in">
-            <a
-              href="/profile"
+            <Link
+              to="/profile"
               className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100"
+              onClick={() => setOpen(false)}
             >
               <FaUserCircle className="text-lg" />
               Profile
-            </a>
-            <a
-              href="/request-credits"
+            </Link>
+            <Link
+              to="/request-credits"
               className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100"
+              onClick={() => setOpen(false)}
             >
               <FaRegCreditCard className="text-lg" />
               Request for Credits
-            </a>
+            </Link>
             <div className="border-t my-1" />
             <button
               className="flex items-center gap-2 px-4 py-2 w-full text-left hover:bg-gray-100 cursor-pointer"
-              onClick={() => {
-                sessionStorage.clear();
-                window.location.href = "/";
-              }}
+              onClick={handleLogout}
             >
               <FaSignOutAlt className="text-lg" />
               Logout

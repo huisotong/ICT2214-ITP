@@ -24,6 +24,11 @@ dist-ssr
 
 #venv
 backend/venv/
+# Python virtual environments
+backend/.venv/
+.venv/
+venv/
+
 
 
 # Environment Variables

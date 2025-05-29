@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
+import { useAuth } from "./context/AuthContext";
 
 // Import styles and components
 import styles from "./styles/global.module.css";
@@ -24,29 +25,8 @@ function App() {
     message: "",
   });
 
-  // Authentication state
-  const [auth, setAuth] = useState({
-    isAuthenticated: false,
-    user: null,
-  });
-
-  // Prevent rendering until authentication check completes
-  const [isAuthChecked, setIsAuthChecked] = useState(false);
-
-  // Fetch user from sessionStorage if exists
-  useEffect(() => {
-    const userFromStorage = sessionStorage.getItem("user");
-
-    if (userFromStorage) {
-      const parsedUser = JSON.parse(userFromStorage);
-      setAuth({
-        isAuthenticated: true,
-        user: parsedUser,
-      });
-    }
-
-    setIsAuthChecked(true);
-  }, []);
+  // Authentication state from context
+  const { auth } = useAuth();
 
   // Auto-close modal after 3 seconds
   useEffect(() => {
@@ -58,11 +38,6 @@ function App() {
     }
   }, [modal]);
 
-  // Show loading screen while checking authentication
-  if (!isAuthChecked) {
-    return <div className={styles.main}>Loading...</div>;
-  }
-
   return (
     <>
       {/* Show global modal if active */}
@@ -71,18 +46,18 @@ function App() {
       {/* Main App Content */}
       <main className={styles.main}>
         <Routes>
-          <Route path="/" element={<LoginPage setAuth={setAuth} />} />
+          <Route path="/" element={<LoginPage />} />
           <Route
             element={
               <PrivateRoute isAuthenticated={auth.isAuthenticated}>
-                <ProtectedLayout user={auth.user} />
+                <ProtectedLayout />
               </PrivateRoute>
             }
           >
             {/* Add more routes that req auth here */}
             <Route
               path="/home"
-              element={<HomePage user={auth.user} setModal={setModal} />}
+              element={<HomePage setModal={setModal} />}
             />
             <Route path="/chat/:id" element={<ChatPage />} />
             <Route
@@ -91,12 +66,12 @@ function App() {
             />
             <Route
               path="/manage-modules"
-              element={<ManageModules user={auth.user} setModal={setModal} />}
+              element={<ManageModules setModal={setModal} />}
             />
             {/* Add the new route below */}
             <Route
               path="/manage-credit-requests"
-              element={<ManageCreditRequests user={auth.user} setModal={setModal} />}
+              element={<ManageCreditRequests setModal={setModal} />}
             />
           </Route>
         </Routes>

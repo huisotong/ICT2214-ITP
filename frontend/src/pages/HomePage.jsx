@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "../context/AuthContext";
 import Modules from "../components/home/Modules";
 import AddModuleOverlay from "../components/home/AddModuleOverlay";
 import { fetchAssignedModules } from "../../utils/fetchAssignedModules";
 
-function HomePage({ user, setModal }) {
+function HomePage({ setModal }) {
+  // Get User through Auth Context
+  const { auth } = useAuth();
+  const user = auth.user;
+
   const [modules, setModules] = useState([]);
   const [toggleAddModule, setToggleAddModule] = useState(false);
 
