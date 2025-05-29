@@ -7,6 +7,7 @@ import { useAuth } from "../context/AuthContext";
 
 export default function ManageModules({ setModal }) {
   const [modules, setModules] = useState([]);
+  const [rightTab, setRightTab] = useState("module");
   const [selectedModule, setSelectedModule] = useState(null);
   const [moduleSettings, setModuleSettings] = useState({
     moduleID: "",
@@ -246,19 +247,54 @@ export default function ManageModules({ setModal }) {
           </div>
 
           {/* ModuleSettings and LLMSettings */}
-          <div className="w-1/2 flex flex-col justify-between items-center h-full overflow-auto space-y-6">
-            <ModuleSettings
-              module={selectedModule}
-              setModal={setModal}
-              moduleSettings={moduleSettings}
-              setModuleSettings={setModuleSettings}
-              onModuleUpdated={onModuleUpdated}
-            />
-            <LLMSettings
-              module={selectedModule}
-              setModal={setModal}
-              refreshTrigger={refreshLLM}
-            />
+          <div className="w-1/2 h-[calc(100vh-150px)] flex flex-col overflow-hidden">
+            {/* Tab Buttons */}
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setRightTab("module")}
+                className={`px-4 py-2 rounded-t-lg text-sm font-semibold transition-all duration-200 ${
+                  rightTab === "module"
+                    ? "bg-white border border-b-0 border-gray-300 text-blue-600"
+                    : "bg-gray-100 border border-gray-300 text-gray-500 hover:text-blue-500"
+                }`}
+              >
+                Module Settings
+              </button>
+              <button
+                onClick={() => setRightTab("llm")}
+                className={`px-4 py-2 rounded-t-lg text-sm font-semibold transition-all duration-200 ${
+                  rightTab === "llm"
+                    ? "bg-white border border-b-0 border-gray-300 text-blue-600"
+                    : "bg-gray-100 border border-gray-300 text-gray-500 hover:text-blue-500"
+                }`}
+              >
+                LLM Settings
+              </button>
+            </div>
+
+            {/* Card Outline Below Tabs */}
+            <div className="border border-gray-300 rounded-b-lg rounded-tr-lg bg-white flex-1 flex flex-col h-full">
+              <div className="flex-1 p-6 overflow-y-auto">
+                {selectedModule && rightTab === "module" && (
+                  <ModuleSettings
+                    module={selectedModule}
+                    setModal={setModal}
+                    moduleSettings={moduleSettings}
+                    setModuleSettings={setModuleSettings}
+                    onModuleUpdated={onModuleUpdated}
+                  />
+                )}
+                {selectedModule && rightTab === "llm" && (
+                  <div className="h-full overflow-y-auto pr-2">
+                  <LLMSettings
+                    module={selectedModule}
+                    setModal={setModal}
+                    refreshTrigger={refreshLLM}
+                  />
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}

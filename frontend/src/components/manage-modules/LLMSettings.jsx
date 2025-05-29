@@ -98,7 +98,7 @@ export default function LLMSettings({ module, setModal, refreshTrigger }) {
 
   // File Upload for Untagging
   const handleDocumentDelete = async (docId) => {
-      try {
+    try {
       const response = await fetch("http://localhost:5000/api/untag-document", {
         method: "POST",
         headers: {
@@ -149,11 +149,12 @@ export default function LLMSettings({ module, setModal, refreshTrigger }) {
   }, [module, refreshTrigger]);
 
   return (
-    <div className="bg-gray-100 p-4 rounded mt-4 w-full h-1/2 overflow-auto flex flex-col justify-evenly">
-      <h2 className="text-xl mb-4">LLM Model Settings</h2>
+    <div className="bg-gray-100 p-4 rounded w-full h-full flex flex-col space-y-3 text-sm">
+      <h2 className="text-base font-semibold">LLM Model Settings</h2>
 
-      <div className="mb-4">
-        <label className="block mb-2">Current Model:</label>
+      {/* Model Selection */}
+      <div>
+        <label className="block mb-1">Current Model:</label>
         <select
           className="w-full p-2 border rounded"
           value={llmSettings.model}
@@ -169,11 +170,10 @@ export default function LLMSettings({ module, setModal, refreshTrigger }) {
         </select>
       </div>
 
-      <div className="space-y-4">
-        <div>
-          <label className="flex items-center space-x-2">
-            <span>Temperature</span>
-          </label>
+      {/* Temperature */}
+      <div className="flex items-center justify-between">
+        <label className="text-sm font-medium">Temperature</label>
+        <div className="flex-1 ml-4 flex items-center gap-2">
           <input
             type="range"
             min="0"
@@ -183,96 +183,97 @@ export default function LLMSettings({ module, setModal, refreshTrigger }) {
             onChange={(e) =>
               setLlmSettings({ ...llmSettings, temperature: e.target.value })
             }
-            className="w-3/4"
+            className="flex-1"
           />
-          <span className="text-sm">{llmSettings.temperature}</span>
+          <span className="text-xs w-8 text-right">
+            {llmSettings.temperature}
+          </span>
         </div>
+      </div>
 
-        <div>
-          <label className="block mb-2">System Prompt:</label>
-          <textarea
-            className="w-full p-2 border rounded"
-            value={llmSettings.systemPrompt}
-            onChange={(e) =>
-              setLlmSettings({ ...llmSettings, systemPrompt: e.target.value })
-            }
-            rows={3}
-          />
-        </div>
+      {/* System Prompt */}
+      <div>
+        <label className="block mb-1">System Prompt:</label>
+        <textarea
+          rows={2}
+          className="w-full p-2 border rounded resize-none"
+          value={llmSettings.systemPrompt}
+          onChange={(e) =>
+            setLlmSettings({ ...llmSettings, systemPrompt: e.target.value })
+          }
+        />
+      </div>
 
-        <div>
-          <label className="flex items-center space-x-2">
-            <span>Maximum Tokens</span>
-          </label>
-          <input
-            type="number"
-            min="1"
-            max="8192"
-            value={llmSettings.maxTokens}
-            onChange={(e) =>
-              setLlmSettings({
-                ...llmSettings,
-                maxTokens: parseInt(e.target.value),
-              })
-            }
-            className="w-full p-2 border rounded"
-          />
-        </div>
-        <button
-          className="bg-green-500 w-full mb-4 text-white px-4 py-2 rounded cursor-pointer hover:bg-green-600 transition"
-          type="submit"
-          onClick={handleSaveChanges}
-        >
-          Save changes
-        </button>
-        <div>
-          <h3 className="text-sm font-medium mb-2">
-            Current Documents Tagged:
-          </h3>
+      {/* Max Tokens */}
+      <div>
+        <label className="block mb-1">Maximum Tokens</label>
+        <input
+          type="number"
+          min="1"
+          max="8192"
+          value={llmSettings.maxTokens}
+          onChange={(e) =>
+            setLlmSettings({
+              ...llmSettings,
+              maxTokens: parseInt(e.target.value),
+            })
+          }
+          className="w-full max-w-[8rem] p-2 border rounded"
+        />
+      </div>
 
-          <div className="border rounded p-2">
-            {availableDocuments.map((doc) => (
-              <div
-                key={doc.id}
-                className="flex items-center justify-between py-1"
+      {/* Save Button */}
+      <button
+        className="bg-green-500 w-full text-white px-3 py-1.5 rounded cursor-pointer hover:bg-green-600 transition text-sm"
+        type="submit"
+        onClick={handleSaveChanges}
+      >
+        Save changes
+      </button>
+
+      {/* Tagged Documents */}
+      <div className="overflow-auto">
+        <h3 className="text-sm font-medium mb-1">Current Documents Tagged:</h3>
+        <div className="border rounded p-2 space-y-1 text-sm max-h-40 overflow-y-auto bg-white">
+          {availableDocuments.map((doc) => (
+            <div key={doc.id} className="flex justify-between items-center">
+              <span>{doc.name}</span>
+              <button
+                onClick={() => handleDocumentDelete(doc.id)}
+                className="text-red-500 hover:text-red-700 text-xs"
               >
-                <label className="flex items-center">{doc.name}</label>
-                <button
-                  onClick={() => handleDocumentDelete(doc.id)}
-                  className="text-red-500 hover:text-red-700 cursor-pointer"
-                >
-                  Untag Document
-                </button>
-              </div>
-            ))}
-            {availableDocuments.length === 0 && (
-              <p className="text-gray-500 italic">No documents available</p>
-            )}
-          </div>
-
-          {/* Add the file upload section */}
-          <div className="mt-4">
-            <label className="block">
-              <span className="cursor-pointer">Tag Documents</span>
-              <input
-                type="file"
-                className="block w-full text-sm text-slate-500
-                  file:mr-4 file:py-2 file:px-4
-                  file:rounded-full file:border-0
-                  file:text-sm file:font-semibold
-                  file:bg-violet-50 file:text-violet-700
-                  hover:file:bg-violet-100
-                  cursor-pointer"
-                onChange={handleFileUpload}
-                accept=".pdf,.doc,.docx,.txt"
-              />
-            </label>
-            <p className="text-xs text-gray-500 mt-1">
-              Supported formats: PDF, DOC, DOCX, TXT; Note that tagging and
-              untagging will be saved automatically on request.
+                Untag
+              </button>
+            </div>
+          ))}
+          {availableDocuments.length === 0 && (
+            <p className="text-gray-500 italic text-xs">
+              No documents available
             </p>
-          </div>
+          )}
         </div>
+      </div>
+
+      {/* File Upload */}
+      <div className="text-xs space-y-1">
+        <label className="block">
+          <span className="cursor-pointer font-medium">Tag Documents</span>
+          <input
+            type="file"
+            className="block w-full text-sm text-slate-500
+              file:mr-4 file:py-1.5 file:px-3
+              file:rounded-full file:border-0
+              file:text-sm file:font-semibold
+              file:bg-violet-50 file:text-violet-700
+              hover:file:bg-violet-100
+              cursor-pointer"
+            onChange={handleFileUpload}
+            accept=".pdf,.doc,.docx,.txt"
+          />
+        </label>
+        <p className="text-gray-500">
+          Supported formats: PDF, DOC, DOCX, TXT. Tagging is automatic.
+        </p>
       </div>
     </div>
   );

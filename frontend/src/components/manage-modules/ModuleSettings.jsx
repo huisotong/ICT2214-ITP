@@ -50,7 +50,7 @@ export default function ModuleSettings({
   }
 
   return (
-    <div className="bg-gray-100 p-4 rounded w-full h-1/2 flex flex-col justify-evenly">
+    <div className="bg-gray-100 p-6 rounded w-full h-full flex flex-col justify-between">
       <h2 className="text-xl mb-4">Module settings</h2>
       <div className="mb-4">
         <label className="block mb-2">Module ID:</label>
