@@ -1,12 +1,25 @@
 import csv
 import io
+import os
 from flask import Blueprint, jsonify, request
+from qdrant_client import QdrantClient
 from app.models.module_assignment import ModuleAssignment
 from app.models.module import Module
 from app.models.users import User
 from app.db import db
+from app.models.chatbot_settings import ChatbotSettings
 
 modules_bp = Blueprint('modules', __name__)
+
+def get_qdrant_client():
+    return QdrantClient(
+        url=os.getenv("QDRANT_HOST"),
+        api_key=os.getenv("QDRANT_API_KEY"),
+        prefer_grpc=False,
+        https=True,
+        timeout=10.0,
+        check_compatibility=False
+    )
 
 @modules_bp.route('/get-assigned-modules', methods=['GET'])
 def get_assigned_modules():
@@ -69,6 +82,16 @@ def add_module():
         )
         db.session.add(owner_assignment)
 
+        # Create default LLM configuration for the module
+        default_chatbot_settings = ChatbotSettings(
+            moduleID=module_id,
+            model='gpt-4',
+            temperature=1.0,
+            system_prompt='You are a helpful AI assistant',
+            max_tokens=2048
+        )
+        db.session.add(default_chatbot_settings)
+
         # Handle CSV file if present
         invalid_students = []  # Track students not found in database
         if 'csvFile' in request.files:
@@ -126,6 +149,17 @@ def delete_module():
 
         # Delete all module assignments first (to handle foreign key constraints)
         ModuleAssignment.query.filter_by(moduleID=module_id).delete()
+
+        ChatbotSettings.query.filter_by(moduleID=module_id).delete()
+
+        # Delete Qdrant collection for this module
+        try:
+            client = get_qdrant_client()
+            collection_name = f"module_{module_id}"
+            if collection_name in [c.name for c in client.get_collections().collections]:
+                client.delete_collection(collection_name=collection_name)
+        except Exception as e:
+            print(f"Error deleting Qdrant collection: {str(e)}")
 
         # Delete the module
         db.session.delete(module)
