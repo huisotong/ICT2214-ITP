@@ -34,6 +34,8 @@ def get_assigned_modules():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
+
+ # TODO: auto add a default llm setting   
 @modules_bp.route('/add-module', methods=['POST'])
 def add_module():
     try:
