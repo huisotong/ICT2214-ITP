@@ -1,6 +1,11 @@
 import { useState, useEffect } from "react";
 
-export default function ManageStudents({ module, setModal, onDeleteAssignment, refreshTrigger }) {
+export default function ManageStudents({
+  module,
+  setModal,
+  onDeleteAssignment,
+  refreshTrigger,
+}) {
   const [students, setStudents] = useState([]);
 
   async function fetchStudents() {
@@ -9,7 +14,9 @@ export default function ManageStudents({ module, setModal, onDeleteAssignment, r
       return;
     }
     try {
-      const response = await fetch(`http://localhost:5000/api/students-in-module/${module.moduleID}`);
+      const response = await fetch(
+        `http://localhost:5000/api/students-in-module/${module.moduleID}`
+      );
       if (!response.ok) throw new Error("Failed to fetch students");
       const data = await response.json();
       setStudents(data);
@@ -25,8 +32,10 @@ export default function ManageStudents({ module, setModal, onDeleteAssignment, r
   }, [module, refreshTrigger]); // watch refreshTrigger to refetch
 
   return (
-    <div className="w-full border p-4 rounded max-h-full overflow-auto bg-white shadow">
-      <h3 className="font-semibold mb-2">Students in {module?.moduleID || ""}</h3>
+    <div className="w-full border p-4 rounded max-h-full h-full overflow-auto bg-white shadow">
+      <h3 className="font-semibold mb-2">
+        Students in {module?.moduleID || ""}
+      </h3>
 
       {students.length > 0 ? (
         <table className="w-full text-left border-collapse">
@@ -41,7 +50,10 @@ export default function ManageStudents({ module, setModal, onDeleteAssignment, r
           </thead>
           <tbody>
             {students.map((student) => (
-              <tr key={student.assignmentID} className="border-b hover:bg-gray-100">
+              <tr
+                key={student.assignmentID}
+                className="border-b hover:bg-gray-100"
+              >
                 <td className="py-1 px-2">{student.studentID}</td>
                 <td className="py-1 px-2">{student.name}</td>
                 <td className="py-1 px-2">{student.email}</td>
@@ -60,13 +72,20 @@ export default function ManageStudents({ module, setModal, onDeleteAssignment, r
                       stroke="currentColor"
                       strokeWidth={2}
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5h6m-6 4h6m-6 4h6m-6 4h6" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M11 5h6m-6 4h6m-6 4h6m-6 4h6"
+                      />
                     </svg>
                   </button>
                   <button
                     className="text-red-600 hover:text-red-800"
                     title="Delete Student"
-                    onClick={() => onDeleteAssignment && onDeleteAssignment(student.assignmentID)}
+                    onClick={() =>
+                      onDeleteAssignment &&
+                      onDeleteAssignment(student.assignmentID)
+                    }
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -76,7 +95,11 @@ export default function ManageStudents({ module, setModal, onDeleteAssignment, r
                       stroke="currentColor"
                       strokeWidth={2}
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M6 18L18 6M6 6l12 12"
+                      />
                     </svg>
                   </button>
                 </td>

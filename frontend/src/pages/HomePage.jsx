@@ -11,6 +11,7 @@ function HomePage({ setModal }) {
 
   const [modules, setModules] = useState([]);
   const [toggleAddModule, setToggleAddModule] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   async function fetchUserAssignedModules() {
     await fetchAssignedModules(user.userID)
@@ -24,7 +25,8 @@ function HomePage({ setModal }) {
 
   useEffect(() => {
     fetchUserAssignedModules();
-  }, []);
+    setRefreshTrigger(0);
+  }, [refreshTrigger]);
 
   return (
     <>
@@ -33,6 +35,7 @@ function HomePage({ setModal }) {
           user={user}
           onClose={() => setToggleAddModule(false)}
           setModal={setModal}
+          setRefreshTrigger={setRefreshTrigger}
         />
       )}
       <div

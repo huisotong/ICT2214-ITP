@@ -228,7 +228,7 @@ export default function ManageModules({ setModal }) {
       {selectedModule && (
         <div className="flex flex-row justify-between items-start w-full h-screen gap-4">
           {/* LEFT: Students list handled by ManageStudents */}
-          <div className="w-1/2">
+          <div className="w-1/2 h-[calc(100vh-200px)]">
             <ManageStudents
               module={selectedModule}
               setModal={setModal}
@@ -247,7 +247,7 @@ export default function ManageModules({ setModal }) {
           </div>
 
           {/* ModuleSettings and LLMSettings */}
-          <div className="w-1/2 h-[calc(100vh-150px)] flex flex-col overflow-hidden">
+          <div className="w-1/2 h-[calc(100vh-150px)] border-1 rounded-md flex flex-col overflow-hidden">
             {/* Tab Buttons */}
             <div className="flex space-x-2">
               <button
@@ -286,11 +286,11 @@ export default function ManageModules({ setModal }) {
                 )}
                 {selectedModule && rightTab === "llm" && (
                   <div className="h-full overflow-y-auto pr-2">
-                  <LLMSettings
-                    module={selectedModule}
-                    setModal={setModal}
-                    refreshTrigger={refreshLLM}
-                  />
+                    <LLMSettings
+                      module={selectedModule}
+                      setModal={setModal}
+                      refreshTrigger={refreshLLM}
+                    />
                   </div>
                 )}
               </div>
