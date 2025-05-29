@@ -64,7 +64,7 @@ export default function LLMSettings({ module, setModal, refreshTrigger }) {
     }
   };
 
-  // TODO
+  // File Upload for Tagging
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -72,15 +72,21 @@ export default function LLMSettings({ module, setModal, refreshTrigger }) {
     // Create FormData object to send file
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("moduleID", module.moduleID);
 
     try {
       // TODO: Implement actual file upload API call
-      console.log("Uploading file:", file.name);
+      const response = await fetch("http://localhost:5000/api/tag-document", {
+        method: "POST",
+        body: formData,
+      });
 
-      // Simulate successful upload - replace with actual API call
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Tagging failed");
+
       const newDoc = {
-        id: Date.now(), // temporary ID - should come from backend
-        name: file.name,
+        id: data.point_id,
+        name: data.filename,
       };
 
       setAvailableDocuments((prev) => [...prev, newDoc]);
@@ -90,10 +96,27 @@ export default function LLMSettings({ module, setModal, refreshTrigger }) {
     }
   };
 
-  // TODO
-  const handleDocumentDelete = (docId) => {
-    // Remove from available documents
-    setAvailableDocuments((prev) => prev.filter((doc) => doc.id !== docId));
+  // File Upload for Untagging
+  const handleDocumentDelete = async (docId) => {
+      try {
+      const response = await fetch("http://localhost:5000/api/untag-document", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          moduleID: module.moduleID,
+          docID: docId,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Untagging failed");
+
+      setAvailableDocuments((prev) => prev.filter((doc) => doc.id !== docId));
+    } catch (error) {
+      console.error("Error untagging document:", error);
+    }
   };
 
   async function fetchLLMSettings() {
