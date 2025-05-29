@@ -14,6 +14,7 @@ import HomePage from "./pages/HomePage";
 import ManageModules from "./pages/ManageModules";
 import ManageCreditRequests from "./pages/ManageCreditRequests"; // Import the new page
 import ChatPage from "./pages/ChatPage";
+import ProfilePage from "./pages/ProfilePage";
 import ProtectedLayout from "./components/global/ProtectedLayout";
 
 function App() {
@@ -59,6 +60,10 @@ function App() {
               element={<HomePage setModal={setModal} />}
             />
             <Route path="/chat/:id" element={<ChatPage />} />
+            <Route
+              path="/profile"
+              element={<ProfilePage user={auth.user} setModal={setModal} />}
+            />
             <Route
               path="/manage-modules"
               element={<ManageModules setModal={setModal} />}
