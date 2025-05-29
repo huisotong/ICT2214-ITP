@@ -18,8 +18,6 @@ function ProfilePage({ user, setModal }) {
   }
 
   async function saveUserDetails() {
-    console.log("userDetails", userDetails);
-    // setIsEditing(false);
     try {
       const response = await fetch(
         `http://localhost:5000/api/users/${user.userID}`,
@@ -54,7 +52,6 @@ function ProfilePage({ user, setModal }) {
           <p className="font-semibold text-lg">{userDetails.name || "N/A"}</p>
           <p className="text-sm text-gray-600">{userDetails.email}</p>
         </div>
-
         <div className="flex gap-2">
           <button
             className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
