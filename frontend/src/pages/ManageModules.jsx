@@ -199,7 +199,7 @@ export default function ManageModules({ setModal }) {
   }, []);
 
   return (
-    <div className="p-4 w-full h-full">
+    <div className="p-4 w-full h-screen flex flex-col overflow-hidden">
       <div className="flex flex-row justify-between items-center w-full mb-4">
         <select
           className="p-2 border rounded cursor-pointer h-10"
@@ -226,7 +226,7 @@ export default function ManageModules({ setModal }) {
       </div>
 
       {selectedModule && (
-        <div className="flex flex-row justify-between items-start w-full h-screen gap-4">
+        <div className="flex flex-row flex-1 gap-4 overflow-hidden">
           {/* LEFT: Students list handled by ManageStudents */}
           <div className="w-1/2">
             <ManageStudents
@@ -247,7 +247,7 @@ export default function ManageModules({ setModal }) {
           </div>
 
           {/* ModuleSettings and LLMSettings */}
-          <div className="w-1/2 h-[calc(100vh-150px)] flex flex-col overflow-hidden">
+          <div className="w-1/2 h-full flex flex-col overflow-hidden">
             {/* Tab Buttons */}
             <div className="flex space-x-2">
               <button
@@ -274,7 +274,7 @@ export default function ManageModules({ setModal }) {
 
             {/* Card Outline Below Tabs */}
             <div className="border border-gray-300 rounded-b-lg rounded-tr-lg bg-white flex-1 flex flex-col h-full">
-              <div className="flex-1 p-6 overflow-y-auto">
+              <div className="flex-1 p-6">
                 {selectedModule && rightTab === "module" && (
                   <ModuleSettings
                     module={selectedModule}
@@ -285,13 +285,11 @@ export default function ManageModules({ setModal }) {
                   />
                 )}
                 {selectedModule && rightTab === "llm" && (
-                  <div className="h-full overflow-y-auto pr-2">
                   <LLMSettings
                     module={selectedModule}
                     setModal={setModal}
                     refreshTrigger={refreshLLM}
                   />
-                  </div>
                 )}
               </div>
             </div>
