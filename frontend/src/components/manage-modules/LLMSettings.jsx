@@ -1,43 +1,133 @@
 import { useState, useEffect } from "react";
 
-export default function LLMSettings({ module, setModal }) {
-  const [llmSettings, setLlmSettings] = useState({
-    model: "Llama 3.3 70B Instruct",
-    temperature: 0,
-    topP: 1,
-    presencePenalty: 0,
-    frequencyPenalty: 0,
-  });
+export default function LLMSettings({ module, setModal, refreshTrigger }) {
+  const [llmSettings, setLlmSettings] = useState({});
 
-  const availableModels = [
-    "Llama 3.3 70B Instruct",
-    "GPT-4",
-    "Claude 2.1",
-    // Add more models as needed
-  ];
+  const [availableDocuments, setAvailableDocuments] = useState([]);
 
-  const handleSaveChanges = () => {
-    // TODO: Implement API call to save LLM settings
-    console.log("Saving LLM settings:", llmSettings);
+  const availableModels = ["gpt-4", "claude-3-sonnet"];
+
+  // Save regular parameters
+  const handleSaveChanges = async () => {
+    try {
+      // Show loading state
+      const saveButton = document.querySelector('button[type="submit"]');
+      if (saveButton) {
+        saveButton.disabled = true;
+        saveButton.innerHTML = "Saving...";
+      }
+
+      // Prepare the settings object
+      const settingsToSave = {
+        model: llmSettings.model,
+        temperature: parseFloat(llmSettings.temperature),
+        systemPrompt: llmSettings.systemPrompt,
+        maxTokens: parseInt(llmSettings.maxTokens),
+      };
+
+      const response = await fetch(
+        "http://localhost:5000/api/save-model-settings",
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            moduleID: module.moduleID,
+            ...settingsToSave,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to update module LLM settings");
+      }
+
+      // Show success message
+      setModal({
+        active: true,
+        type: "success",
+        message: `LLM settings for module ${module.moduleID} updated successfully!`,
+      });
+    } catch (error) {
+      console.error("Error saving settings:", error);
+      toast.error(error.response?.data?.message || "Failed to save settings");
+    } finally {
+      // Reset button state
+      const saveButton = document.querySelector('button[type="submit"]');
+      if (saveButton) {
+        saveButton.disabled = false;
+        saveButton.innerHTML = "Save changes";
+      }
+    }
+  };
+
+  // TODO
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Create FormData object to send file
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      // TODO: Implement actual file upload API call
+      console.log("Uploading file:", file.name);
+
+      // Simulate successful upload - replace with actual API call
+      const newDoc = {
+        id: Date.now(), // temporary ID - should come from backend
+        name: file.name,
+      };
+
+      setAvailableDocuments((prev) => [...prev, newDoc]);
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      // Add error handling as needed
+    }
+  };
+
+  // TODO
+  const handleDocumentDelete = (docId) => {
+    // Remove from available documents
+    setAvailableDocuments((prev) => prev.filter((doc) => doc.id !== docId));
   };
 
   async function fetchLLMSettings() {
-    setLlmSettings({
-      model: "Llama 3.3 70B Instruct",
-      temperature: 0,
-      topP: 1,
-      presencePenalty: 0,
-      frequencyPenalty: 0,
-    });
-    return;
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/get-model-settings/${module.moduleID}`
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to fetch settings");
+      }
+
+      console.log(data.settings);
+
+      // Update LLM settings
+      setLlmSettings(data.settings);
+
+      // Update available documents
+      setAvailableDocuments(data.documents);
+    } catch (error) {
+      console.error("Error fetching settings:", error);
+      toast.error("Failed to fetch settings");
+    }
   }
 
   // Fetch chatbot settings when the component mounts
-  useEffect(() => {}, []);
+  useEffect(() => {
+    fetchLLMSettings();
+  }, [module, refreshTrigger]);
 
   return (
     <div className="bg-gray-100 p-4 rounded mt-4 w-full h-1/2 overflow-auto flex flex-col justify-evenly">
-      <h2 className="text-xl mb-4">LLM Model settings</h2>
+      <h2 className="text-xl mb-4">LLM Model Settings</h2>
 
       <div className="mb-4">
         <label className="block mb-2">Current Model:</label>
@@ -64,7 +154,7 @@ export default function LLMSettings({ module, setModal }) {
           <input
             type="range"
             min="0"
-            max="1"
+            max="2"
             step="0.1"
             value={llmSettings.temperature}
             onChange={(e) =>
@@ -76,72 +166,91 @@ export default function LLMSettings({ module, setModal }) {
         </div>
 
         <div>
-          <label className="flex items-center space-x-2">
-            <span>Top P</span>
-          </label>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.1"
-            value={llmSettings.topP}
+          <label className="block mb-2">System Prompt:</label>
+          <textarea
+            className="w-full p-2 border rounded"
+            value={llmSettings.systemPrompt}
             onChange={(e) =>
-              setLlmSettings({ ...llmSettings, topP: e.target.value })
+              setLlmSettings({ ...llmSettings, systemPrompt: e.target.value })
             }
-            className="w-3/4"
+            rows={3}
           />
-          <span className="text-sm">{llmSettings.topP}</span>
         </div>
 
         <div>
           <label className="flex items-center space-x-2">
-            <span>Presence Penalty</span>
+            <span>Maximum Tokens</span>
           </label>
           <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.1"
-            value={llmSettings.presencePenalty}
+            type="number"
+            min="1"
+            max="8192"
+            value={llmSettings.maxTokens}
             onChange={(e) =>
               setLlmSettings({
                 ...llmSettings,
-                presencePenalty: e.target.value,
+                maxTokens: parseInt(e.target.value),
               })
             }
-            className="w-3/4"
+            className="w-full p-2 border rounded"
           />
-          <span className="text-sm">{llmSettings.presencePenalty}</span>
         </div>
-
+        <button
+          className="bg-green-500 w-full mb-4 text-white px-4 py-2 rounded cursor-pointer hover:bg-green-600 transition"
+          type="submit"
+          onClick={handleSaveChanges}
+        >
+          Save changes
+        </button>
         <div>
-          <label className="flex items-center space-x-2">
-            <span>Frequency Penalty</span>
-          </label>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.1"
-            value={llmSettings.frequencyPenalty}
-            onChange={(e) =>
-              setLlmSettings({
-                ...llmSettings,
-                frequencyPenalty: e.target.value,
-              })
-            }
-            className="w-3/4"
-          />
-          <span className="text-sm">{llmSettings.frequencyPenalty}</span>
+          <h3 className="text-sm font-medium mb-2">
+            Current Documents Tagged:
+          </h3>
+
+          <div className="border rounded p-2">
+            {availableDocuments.map((doc) => (
+              <div
+                key={doc.id}
+                className="flex items-center justify-between py-1"
+              >
+                <label className="flex items-center">{doc.name}</label>
+                <button
+                  onClick={() => handleDocumentDelete(doc.id)}
+                  className="text-red-500 hover:text-red-700 cursor-pointer"
+                >
+                  Untag Document
+                </button>
+              </div>
+            ))}
+            {availableDocuments.length === 0 && (
+              <p className="text-gray-500 italic">No documents available</p>
+            )}
+          </div>
+
+          {/* Add the file upload section */}
+          <div className="mt-4">
+            <label className="block">
+              <span className="cursor-pointer">Tag Documents</span>
+              <input
+                type="file"
+                className="block w-full text-sm text-slate-500
+                  file:mr-4 file:py-2 file:px-4
+                  file:rounded-full file:border-0
+                  file:text-sm file:font-semibold
+                  file:bg-violet-50 file:text-violet-700
+                  hover:file:bg-violet-100
+                  cursor-pointer"
+                onChange={handleFileUpload}
+                accept=".pdf,.doc,.docx,.txt"
+              />
+            </label>
+            <p className="text-xs text-gray-500 mt-1">
+              Supported formats: PDF, DOC, DOCX, TXT; Note that tagging and
+              untagging will be saved automatically on request.
+            </p>
+          </div>
         </div>
       </div>
-
-      <button
-        className="bg-green-500 mt-4 text-white px-4 py-2 rounded cursor-pointer hover:bg-green-600 transition"
-        onClick={handleSaveChanges}
-      >
-        Save changes
-      </button>
     </div>
   );
 }
