@@ -1,6 +1,11 @@
 import { useState } from "react";
 
-export default function AddModuleOverlay({ user, onClose, setModal }) {
+export default function AddModuleOverlay({
+  user,
+  onClose,
+  setModal,
+  setRefreshTrigger,
+}) {
   const [moduleParams, setModuleParams] = useState({
     id: "",
     name: "",
@@ -54,7 +59,7 @@ export default function AddModuleOverlay({ user, onClose, setModal }) {
       }
 
       // Construct success message including warnings if any
-      let successMessage = `Module ${moduleParams.name} created successfully! Please refresh the page to see the changes.`;
+      let successMessage = `Module ${moduleParams.name} created successfully!`;
       if (data.warnings) {
         successMessage += `\n\n${data.warnings}`;
       }
@@ -64,6 +69,7 @@ export default function AddModuleOverlay({ user, onClose, setModal }) {
         type: "success",
         message: successMessage,
       });
+      setRefreshTrigger(1);
       onClose();
     } catch (error) {
       console.error("Error creating module:", error);
