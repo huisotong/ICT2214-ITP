@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request, make_response
 from flask_jwt_extended import create_access_token, set_access_cookies, jwt_required, get_jwt_identity, unset_jwt_cookies
+from datetime import datetime, timedelta
 from datetime import timedelta
 from app.models.users import User
 from app.db import db
@@ -56,7 +57,7 @@ def login():
         return jsonify({'error': 'Invalid email or password'}), 401
 
     # ✅ Generate JWT token valid for 1 day
-    access_token = create_access_token(identity=user.userID, expires_delta=timedelta(days=1))
+    access_token = create_access_token(identity=str(user.userID), expires_delta=timedelta(days=1))
 
     # ✅ Create response with secure cookie
     response = make_response(jsonify({
@@ -70,7 +71,8 @@ def login():
             "studentID": user.studentID
         }
     }))
-    set_access_cookies(response, access_token)
+    print("✅ Login cookie set")
+    set_access_cookies(response, access_token, max_age=60*60*24)
     return response, 200
 
 # Route to securely log users out and unset their tokens (cant just brute force through URL)

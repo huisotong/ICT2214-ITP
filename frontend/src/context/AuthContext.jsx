@@ -7,18 +7,33 @@ export function AuthProvider({ children }) {
   const [isAuthChecked, setIsAuthChecked] = useState(false);
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/me", {
-      method: "GET",
-      credentials: "include",
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data) {
-          setAuth({ isAuthenticated: true, user: data });
-        }
+    async function fetchUser() {
+      try {
+        const res = await fetch("http://localhost:5000/api/me", {
+          method: "GET",
+          credentials: "include", // VERY IMPORTANT to include the JWT cookie
+        });
+
+        if (!res.ok) throw new Error("Not authenticated");
+
+        const data = await res.json();
+
+        setAuth({
+          isAuthenticated: true,
+          user: data,
+        });
+      } catch (err) {
+        // Ensure user is marked as unauthenticated
+        setAuth({
+          isAuthenticated: false,
+          user: null,
+        });
+      } finally {
         setIsAuthChecked(true);
-      })
-      .catch(() => setIsAuthChecked(true));
+      }
+    }
+
+    fetchUser();
   }, []);
 
   if (!isAuthChecked) return <div>Loading...</div>;

@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from datetime import timedelta
@@ -16,19 +16,30 @@ from sqlalchemy import text
 def create_app():
     app = Flask(__name__)
     # CORS for frontend
-    CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": {os.getenv("FRONTEND_ROUTE")}}})
+    CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": "http://localhost:5173"}})
 
     # Connect to db
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv('SQLALCHEMY_DATABASE_URI')
     db.init_app(app)
 
-    # JWT Configuration
-    app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")  # Use env var in production!
+    # JWT secret
+    app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
+
+    # Store token in a cookie
     app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
+
+    # Cookie path and persistence
     app.config["JWT_ACCESS_COOKIE_PATH"] = "/"
-    app.config["JWT_COOKIE_SECURE"] = False  # True in production with HTTPS
-    app.config["JWT_COOKIE_CSRF_PROTECT"] = False  # Set True if using CSRF protection
-    app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=1)
+    app.config["JWT_SESSION_COOKIE"] = False  # ✅ Makes cookie persistent
+
+    # Cookie expiration
+    app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=1)  # ✅ Must be set
+
+    # Cross-site and dev mode support
+    app.config["JWT_COOKIE_SAMESITE"] = "None"    # ✅ For cross-origin requests (5173 <-> 5000)
+    app.config["JWT_COOKIE_SECURE"] = True       # ✅ Set True only in production (HTTPS)
+    app.config["JWT_COOKIE_CSRF_PROTECT"] = False # ✅ For dev; use True with CSRF tokens in prod
+
 
     jwt = JWTManager(app)
     
