@@ -20,8 +20,7 @@ from langchain.schema import HumanMessage
 from langchain_openai import ChatOpenAI
 from langchain.chains import ConversationalRetrievalChain
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Qdrant
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_qdrant import Qdrant
 
 chatbot_bp = Blueprint('chatbot', __name__)
 UPLOAD_FOLDER = Path("uploads")
@@ -41,42 +40,33 @@ def get_qdrant_client():
 
 # Function to tag document from qdrant
 def tag_document_to_qdrant(module_id: str, file_content: str, filename: str):
-    # 1. Split text into chunks
-    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-    chunks = splitter.split_text(file_content)
-
-    # 2. Embed each chunk
-    embeddings = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2",
-        model_kwargs={"device": "cpu"}
-    )
-    chunk_vectors = embeddings.embed_documents(chunks)
-    vector_size = len(chunk_vectors[0])
-
-    # 3. Create collection if needed
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    vector = embeddings.embed_query(file_content)
+    vector_size = len(vector)
+    
     client = get_qdrant_client()
     collection_name = f"module_{module_id}"
+
+    # Create collection if missing
     if collection_name not in [c.name for c in client.get_collections().collections]:
         client.recreate_collection(
             collection_name=collection_name,
             vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE)
         )
 
-    # 4. Insert each chunk as a separate point
-    points = []
-    for i, chunk in enumerate(chunks):
-        points.append(PointStruct(
-            id=str(uuid.uuid4()),
-            vector=chunk_vectors[i],
-            payload={"filename": filename, "text": chunk}
-        ))
+    point_id = str(uuid.uuid4())
 
-    print(f"📌 Created {len(points)} chunks for {filename}")
-    result = client.upsert(collection_name=collection_name, points=points)
+    point = PointStruct(
+        id=point_id,
+        vector=vector,
+        payload={"filename": filename, "text": file_content}
+    )
+
+    print("📌 Point created, sending to Qdrant...")
+    result = client.upsert(collection_name=collection_name, points=[point])
     print("Qdrant upsert result:", result)
 
-    return [p.id for p in points]
-
+    return point_id
 
 # Function to untag document from qdrant
 def untag_document_from_qdrant(module_id: str, point_id: str):
@@ -180,11 +170,11 @@ def tag_document():
         else:
             content = file.read().decode("utf-8")
 
-        point_ids = tag_document_to_qdrant(module_id, content, file.filename)
+        point_id = tag_document_to_qdrant(module_id, content, file.filename)
 
         return jsonify({
             "status": "success",
-            "point_id": point_ids,
+            "point_id": point_id,
             "filename": file.filename,
         }), 200
 
@@ -285,7 +275,7 @@ def send_message():
 
         # For the first message, generate a chat title from the user's input.
         if not previous_messages:
-            print("There is no existing message")
+            print("THrs no exisitn message")
             title_prompt = (
                 f"Provide one short, descriptive chat title for the following conversation. "
                 f"Return only the title, without numbering or additional commentary: {user_message}"
@@ -327,24 +317,14 @@ def send_message():
         # Generate the bot response.
         if texts:  # When documents exist, use the ConversationalRetrievalChain.
             embeddings = HuggingFaceEmbeddings(
-                model_name="sentence-transformers/all-MiniLM-L6-v2",
-                model_kwargs={"device": "cpu"}
+                model_name="sentence-transformers/all-MiniLM-L6-v2"
             )
             vectorstore = Qdrant(
                 client=client,
                 collection_name=collection_name,
                 embeddings=embeddings
             )
-            retriever = vectorstore.as_retriever(
-                search_kwargs={
-                    "k": 10,  # Increase how many to return
-                    "score_threshold": 0.1  # Accept even loosely matched chunks
-                }
-            )
-            docs_and_scores = vectorstore.similarity_search_with_score(user_message, k=10)
-            for doc, score in docs_and_scores:
-                print(f"📄 SCORE: {score:.4f} — {doc.page_content[:100]}")
-
+            retriever = vectorstore.as_retriever()
             chain = ConversationalRetrievalChain.from_llm(
                 llm=ChatOpenAI(
                     model_name=settings.model,
@@ -354,13 +334,10 @@ def send_message():
                     openai_api_base=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
                 ),
                 retriever=retriever,
-                return_source_documents=True
+                return_source_documents=False
             )
             chain_input = {"question": system_context + user_message, "chat_history": conversation_history}
             chain_result = chain(chain_input)
-            print("🔍 Retrieved documents:")
-            for doc in chain_result["source_documents"]:
-                print(doc.page_content)
             bot_response = chain_result.get("answer", "I'm sorry, I couldn't generate a response.")
         else:  # No documents: build prompt from conversation_history.
             prompt_text = ""
