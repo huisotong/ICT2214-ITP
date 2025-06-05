@@ -16,12 +16,11 @@ from docx import Document
 from io import BytesIO
 import traceback
 from datetime import datetime
-from langchain.chat_models import ChatOpenAI
 from langchain.schema import HumanMessage
-from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.vectorstores import Qdrant as LC_Qdrant
+from langchain_openai import ChatOpenAI
 from langchain.chains import ConversationalRetrievalChain
-
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_qdrant import Qdrant
 
 chatbot_bp = Blueprint('chatbot', __name__)
 UPLOAD_FOLDER = Path("uploads")
@@ -41,7 +40,10 @@ def get_qdrant_client():
 
 # Function to tag document from qdrant
 def tag_document_to_qdrant(module_id: str, file_content: str, filename: str):
-    dummy_vector = [0.0] * 10
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    vector = embeddings.embed_query(file_content)
+    vector_size = len(vector)
+    
     client = get_qdrant_client()
     collection_name = f"module_{module_id}"
 
@@ -49,14 +51,14 @@ def tag_document_to_qdrant(module_id: str, file_content: str, filename: str):
     if collection_name not in [c.name for c in client.get_collections().collections]:
         client.recreate_collection(
             collection_name=collection_name,
-            vectors_config=VectorParams(size=len(dummy_vector), distance=Distance.COSINE)
+            vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE)
         )
 
     point_id = str(uuid.uuid4())
 
     point = PointStruct(
         id=point_id,
-        vector=dummy_vector,
+        vector=vector,
         payload={"filename": filename, "text": file_content}
     )
 
@@ -286,7 +288,7 @@ def send_message():
                 openai_api_key=os.getenv("OPENROUTER_API_KEY"),
                 openai_api_base=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
             )
-            title_response = llm_for_title([HumanMessage(content=title_prompt)])
+            title_response = llm_for_title.invoke([HumanMessage(content=title_prompt)])
             chat_title = title_response.content.strip()
             # Save the generated title only once.
             chat_session.chatlog = chat_title
@@ -314,15 +316,13 @@ def send_message():
 
         # Generate the bot response.
         if texts:  # When documents exist, use the ConversationalRetrievalChain.
-            embeddings = OpenAIEmbeddings(
-                openai_api_key=os.getenv("OPENROUTER_API_KEY"),
-                openai_api_base=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+            embeddings = HuggingFaceEmbeddings(
+                model_name="sentence-transformers/all-MiniLM-L6-v2"
             )
-            vectorstore = LC_Qdrant.from_texts(
-                texts,
-                embeddings,
+            vectorstore = Qdrant(
+                client=client,
                 collection_name=collection_name,
-                metadatas=metadatas
+                embeddings=embeddings
             )
             retriever = vectorstore.as_retriever()
             chain = ConversationalRetrievalChain.from_llm(
