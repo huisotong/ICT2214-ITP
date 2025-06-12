@@ -5,7 +5,18 @@ export default function LLMSettings({ module, setModal, refreshTrigger }) {
 
   const [availableDocuments, setAvailableDocuments] = useState([]);
 
-  const availableModels = ["gpt-4", "claude-3-sonnet"];
+  const availableModels = [
+    { label: "Gpt-4 (Paid)", value: "openai/gpt-4" },
+    { label: "Deepseek-V3 (Paid)", value: "deepseek/deepseek-chat-v3-0324" },
+    { label: "Gemini-2.0 (Paid)", value: "google/gemini-2.0-flash-001" },
+    { label: "Claude-3 (Paid)", value: "anthropic/claude-3-sonnet" },
+    { label: "Deepseek-R1 (Free)", value: "deepseek/deepseek-r1-0528:free" },
+    { label: "Gemma-3n (Free)", value: "google/gemma-3n-e4b-it:free" },
+    {
+      label: "Deepseek-V3 (Free)",
+      value: "deepseek/deepseek-chat-v3-0324:free",
+    },
+  ];
 
   // Save regular parameters
   const handleSaveChanges = async () => {
@@ -163,8 +174,8 @@ export default function LLMSettings({ module, setModal, refreshTrigger }) {
           }
         >
           {availableModels.map((model) => (
-            <option key={model} value={model}>
-              {model}
+            <option key={model.value} value={model.value}>
+              {model.label}
             </option>
           ))}
         </select>

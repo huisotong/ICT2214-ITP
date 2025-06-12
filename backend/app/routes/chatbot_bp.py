@@ -275,7 +275,7 @@ def send_message():
 
         # For the first message, generate a chat title from the user's input.
         if not previous_messages:
-            print("THrs no exisitn message")
+            print("There is no existing messages!")
             title_prompt = (
                 f"Provide one short, descriptive chat title for the following conversation. "
                 f"Return only the title, without numbering or additional commentary: {user_message}"
