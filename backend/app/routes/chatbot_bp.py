@@ -20,7 +20,8 @@ from langchain.schema import HumanMessage
 from langchain_openai import ChatOpenAI
 from langchain.chains import ConversationalRetrievalChain
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_qdrant import Qdrant
+from langchain_qdrant import QdrantVectorStore
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 chatbot_bp = Blueprint('chatbot', __name__)
 UPLOAD_FOLDER = Path("uploads")
@@ -40,8 +41,8 @@ def get_qdrant_client():
 
 # Function to tag document from qdrant
 def tag_document_to_qdrant(module_id: str, file_content: str, filename: str):
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-    vector = embeddings.embed_query(file_content)
+    embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-base-en-v1.5")
+    vector = embeddings.embed_documents([file_content])[0]
     vector_size = len(vector)
     
     client = get_qdrant_client()
@@ -170,12 +171,24 @@ def tag_document():
         else:
             content = file.read().decode("utf-8")
 
-        point_id = tag_document_to_qdrant(module_id, content, file.filename)
+        # Chunk the content into 500-character chunks with 50-character overlap
+        splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
+        chunks = splitter.split_text(content)
+
+        if not chunks:
+            return jsonify({"error": "No content extracted from file"}), 400
+
+        point_ids = []
+        for i, chunk in enumerate(chunks):
+            part_filename = f"{file.filename} - Part {i+1}"
+            point_id = tag_document_to_qdrant(module_id, chunk, part_filename)
+            point_ids.append(point_id)
 
         return jsonify({
             "status": "success",
             "point_id": point_id,
             "filename": file.filename,
+            "num_chunks": len(chunks)
         }), 200
 
     except Exception as e:
@@ -308,23 +321,44 @@ def send_message():
         for doc in documents:
             text_content = doc.payload.get("text", "")
             texts.append(text_content)
-            print("text_content",text_content)
             metadatas.append({
-                "id": str(doc.id),
+                "id": str(doc.id),  
                 "filename": doc.payload.get("filename")
             })
 
         # Generate the bot response.
         if texts:  # When documents exist, use the ConversationalRetrievalChain.
-            embeddings = HuggingFaceEmbeddings(
-                model_name="sentence-transformers/all-MiniLM-L6-v2"
-            )
-            vectorstore = Qdrant(
+            embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-base-en-v1.5")
+            vectorstore = QdrantVectorStore(
                 client=client,
                 collection_name=collection_name,
-                embeddings=embeddings
+                embedding=embeddings
             )
-            retriever = vectorstore.as_retriever()
+            retriever = vectorstore.as_retriever(
+                search_kwargs={
+                    "k": 20,  # Increase how many to return
+                    "score_threshold": 0.5  # Accept even loosely matched chunks
+                }
+            )
+            # Run similarity search
+            docs_and_scores = vectorstore.similarity_search_with_score(user_message, k=10)
+
+            # 🔧 Flatten filename from nested metadata
+            for doc, _ in docs_and_scores:
+                if '__original__' in doc.metadata:
+                    original = doc.metadata['__original__']
+                    if isinstance(original, dict):
+                        payload = original.get('payload', {})
+                        if isinstance(payload, dict):
+                            filename = payload.get('filename')
+                            if filename:
+                                doc.metadata['filename'] = filename  # Promote to top-level
+
+            # ✅ Print each doc's score and filename
+            for doc, score in docs_and_scores:
+                filename = doc.metadata.get("filename", "Unknown")
+                print(f"📄 SCORE: {score:.4f} — ({filename}) {doc.page_content[:100]}")
+
             chain = ConversationalRetrievalChain.from_llm(
                 llm=ChatOpenAI(
                     model_name=settings.model,
@@ -334,10 +368,10 @@ def send_message():
                     openai_api_base=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
                 ),
                 retriever=retriever,
-                return_source_documents=False
+                return_source_documents=True
             )
             chain_input = {"question": system_context + user_message, "chat_history": conversation_history}
-            chain_result = chain(chain_input)
+            chain_result = chain.invoke(chain_input)
             bot_response = chain_result.get("answer", "I'm sorry, I couldn't generate a response.")
         else:  # No documents: build prompt from conversation_history.
             prompt_text = ""
