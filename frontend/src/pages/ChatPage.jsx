@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useParams } from "react-router-dom"; // For route params
+import { useParams } from "react-router-dom";
 import Tooltip from "../components/global/Tooltip";
-import styles from "../styles/global.module.css";
+import styles from "../styles/chatpage.module.css";
 import { useAuth } from "../context/AuthContext";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -12,20 +12,18 @@ function ChatPage() {
   const [moduleId] = useState(id);
   const { auth } = useAuth();
   const user = auth.user;
-  const [chats, setChats] = useState([]); // Sidebar chat list
+  const [chats, setChats] = useState([]);
   const [selectedChatId, setSelectedChatId] = useState(null);
   const [input, setInput] = useState("");
   const [modelDetails, setModelDetails] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [userId] = useState(user.userID); // assume user.userID exists
+  const [userId] = useState(user.userID);
   const [assignmentCredits, setAssignmentCredits] = useState(null);
   const [lastCost, setLastCost] = useState(null);
 
-  // Ref for scrolling to bottom of the messages area
   const messagesEndRef = useRef(null);
-
   const inputRef = useRef(null);
-  // Function to scroll to bottom
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -49,7 +47,6 @@ function ChatPage() {
     fetchModelDetails();
   }, [moduleId]);
 
-  // load existing chats.
   useEffect(() => {
     fetch(`http://localhost:5000/api/get-chat-history/${userId}/${moduleId}`)
       .then((res) => res.json())
@@ -58,14 +55,13 @@ function ChatPage() {
           id: chat.historyID,
           title: chat.chatlog || "Chat " + chat.historyID,
           dateStarted: chat.dateStarted,
-          messages: [], // Will be loaded when chat is selected.
+          messages: [],
         }));
         setChats(chatList);
       })
       .catch((err) => console.error("Error fetching chat list:", err));
   }, [userId, moduleId]);
 
-  // When a chat is selected, load its messages.
   useEffect(() => {
     if (selectedChatId) {
       fetch(`http://localhost:5000/api/get-chat-message/${selectedChatId}`)
@@ -103,14 +99,12 @@ function ChatPage() {
     setLastCost(null);
   };
 
-  // When sending a message.
   const handleSend = async (e) => {
     e.preventDefault();
     if (!input.trim()) return;
 
     let currentChatId = selectedChatId;
     if (!currentChatId) {
-      // For new chat, create a temp chat.
       const newChat = {
         id: null,
         title: "New Chat",
@@ -118,7 +112,6 @@ function ChatPage() {
       };
       setChats((prev) => [newChat, ...prev]);
     }
-    // Append user's message and a placeholder for the AI response.
     setChats((prevChats) =>
       prevChats.map((chat) =>
         chat.id === selectedChatId || (!chat.id && selectedChatId === null)
@@ -146,13 +139,11 @@ function ChatPage() {
     setInput("");
     setLoading(true);
 
-    // Prepare payload: include user_id if no chat exists.
     const payload = {
       chat_id: selectedChatId ? selectedChatId : null,
       user_id: userId,
       module_id: moduleId,
       message: messageToSend,
-      // model: selectedModel,
     };
 
     try {
@@ -212,7 +203,6 @@ function ChatPage() {
 
   const selectedChat = chats.find((chat) => chat.id === selectedChatId);
 
-  // Fetch assignment credits for this user and module
   useEffect(() => {
     async function fetchCredits() {
       try {
@@ -220,7 +210,6 @@ function ChatPage() {
           `http://localhost:5000/api/students-in-module/${moduleId}`
         );
         const data = await res.json();
-        // Find the assignment for this user by comparing the correct IDs
         const assignment = data.find((a) => a.userID === userId);
         setAssignmentCredits(assignment ? assignment.studentCredits : null);
       } catch (err) {
@@ -232,55 +221,22 @@ function ChatPage() {
   }, [moduleId, userId]);
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flex: 1,
-        height: "calc(100vh - 64px)",
-        background: "#f3f4f6",
-      }}
-    >
+    <div className={styles.chatPageRoot}>
       {/* Sidebar */}
-      <aside
-        style={{
-          width: 260,
-          background: "#fff",
-          borderRight: "1px solid #e5e7eb",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        <button
-          onClick={handleNewChat}
-          style={{
-            margin: "1rem",
-            padding: "0.75rem",
-            background: "#4a90e2",
-            color: "#fff",
-            border: "none",
-            borderRadius: 6,
-            fontWeight: "bold",
-            cursor: "pointer",
-          }}
-        >
+      <aside className={styles.sidebar}>
+        <button className={styles.newChatButton} onClick={handleNewChat}>
           + New Chat
         </button>
-        <div style={{ flex: 1, overflowY: "auto" }}>
+        <div className={styles.chatList}>
           {chats.map((chat) => (
             <div
               key={chat.id || Math.random()}
               onClick={() => handleSelectChat(chat.id)}
-              style={{
-                padding: "0.75rem 1rem",
-                background:
-                  chat.id === selectedChatId ? "#e0e7ef" : "transparent",
-                cursor: "pointer",
-                borderBottom: "1px solid #f1f1f1",
-                fontWeight: chat.id === selectedChatId ? "bold" : "normal",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-              }}
+              className={
+                chat.id === selectedChatId
+                  ? `${styles.chatListItem} ${styles.chatListItemSelected}`
+                  : styles.chatListItem
+              }
             >
               <div onClick={(e) => e.stopPropagation()}>{chat.title}</div>
             </div>
@@ -289,31 +245,21 @@ function ChatPage() {
       </aside>
 
       {/* Main Chat Area */}
-      <section style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+      <section className={styles.mainSection}>
         {/* Top Bar: Model Selection */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            padding: "1rem",
-            borderBottom: "1px solid #e5e7eb",
-            background: "#f9fafb",
-            gap: 16,
-          }}
-        >
+        <div className={styles.topBar}>
           <div>
             Model:{" "}
-            <span style={{ fontWeight: "bold" }}>
+            <span className={styles.modelName}>
               {modelDetails ? `${modelDetails.model_name}` : "Loading..."}
             </span>
           </div>
-          {/* Show assignment credits next to model */}
-          <span style={{ marginLeft: 16, fontWeight: 500, color: "#000000" }}>
+          <span className={styles.credits}>
             Credits:{" "}
             {assignmentCredits !== null ? assignmentCredits.toFixed(5) : "..."}{" "}
             USD
             {lastCost > 0 && (
-              <span style={{ color: "red", marginLeft: "8px" }}>
+              <span className={styles.creditsCost}>
                 (-{lastCost.toFixed(5)})
               </span>
             )}
@@ -321,38 +267,16 @@ function ChatPage() {
         </div>
 
         {/* Chat messages area */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            padding: "2rem",
-            display: "flex",
-            flexDirection: "column",
-            gap: "1.5rem",
-            justifyContent:
-              selectedChat && selectedChat.messages.length
-                ? "flex-start"
-                : "center",
-            alignItems: "center",
-            textAlign: "center",
-            background: "#F9FAFC",
-          }}
-        >
+        <div className={styles.messagesArea}>
           {selectedChat && selectedChat.messages.length > 0 ? (
             selectedChat.messages.map((msg, idx) => (
               <div
                 key={idx}
-                style={{
-                  alignSelf: msg.sender === "user" ? "flex-end" : "flex-start",
-                  background: msg.sender === "user" ? "#4a90e2" : "#e5e7eb",
-                  color: msg.sender === "user" ? "#fff" : "#222",
-                  padding: "0.75rem 1.25rem",
-                  borderRadius: 16,
-                  maxWidth: "70%",
-                  fontSize: 16,
-                  boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-                  textAlign: msg.sender === "user" ? "right" : "left",
-                }}
+                className={
+                  msg.sender === "user"
+                    ? `${styles.messageBubble} ${styles.messageBubbleUser}`
+                    : styles.messageBubble
+                }
                 onClick={() => console.log("Boop", msg.content)}
               >
                 {msg.sender === "ai" && !msg.placeholder ? (
@@ -395,27 +319,17 @@ function ChatPage() {
               </div>
             ))
           ) : (
-            <div style={{ color: "#888", fontSize: 18 }}>
-              Start chatting now
-            </div>
+            <div className={styles.emptyMessage}>Start chatting now</div>
           )}
-          {/* Dummy div to anchor auto-scroll */}
           <div ref={messagesEndRef} />
         </div>
 
         {/* Input box / Form: pinned to bottom */}
         <form
           onSubmit={handleSend}
-          style={{
-            marginTop: "auto",
-            display: "flex",
-            alignItems: "center",
-            padding: "1rem",
-            borderTop: "1px solid #e5e7eb",
-            gap: 12,
-            opacity: loading ? 0.6 : 1,
-            background: loading ? "#f2f2f2" : "#fff",
-          }}
+          className={`${styles.inputForm} ${
+            loading ? styles.inputFormLoading : ""
+          }`}
         >
           <input
             type="text"
@@ -424,28 +338,12 @@ function ChatPage() {
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            style={{
-              flex: 1,
-              padding: "0.75rem 1rem",
-              borderRadius: 8,
-              border: "1px solid #ccc",
-              fontSize: 16,
-              outline: "none",
-            }}
+            className={styles.inputBox}
           />
           <button
             type="submit"
             disabled={loading}
-            style={{
-              padding: "0.75rem 1.5rem",
-              background: "#4a90e2",
-              color: "#fff",
-              border: "none",
-              borderRadius: 8,
-              fontWeight: "bold",
-              cursor: "pointer",
-              fontSize: 16,
-            }}
+            className={styles.sendButton}
           >
             {loading ? "Generating..." : "Send"}
           </button>
