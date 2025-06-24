@@ -312,10 +312,10 @@ function ChatPage() {
           </div>
           {/* Show assignment credits next to model */}
           <span style={{ marginLeft: 16, fontWeight: 500, color: '#000000' }}>
-            Credits: {assignmentCredits !== null ? assignmentCredits.toFixed(9) : '...'} USD
+            Credits: {assignmentCredits !== null ? assignmentCredits.toFixed(5) : '...'} USD
             {lastCost > 0 && (
               <span style={{ color: 'red', marginLeft: '8px' }}>
-                (-{lastCost.toFixed(9)})
+                (-{lastCost.toFixed(5)})
               </span>
             )}
           </span>

@@ -426,7 +426,7 @@ def send_message():
 
 
         # Calculate cost and deduct from the student's credit balance
-        cost = ((prompt_tokens / 1000) * prompt_price) + ((completion_tokens / 1000) * completion_price)
+        cost = (prompt_tokens * prompt_price) + (completion_tokens * completion_price)
         print("Cost of this request:", cost)
         print("Student credit before deduction:", assignment.studentCredits)
         assignment.studentCredits -= cost
