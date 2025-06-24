@@ -7,8 +7,6 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 
-const mockModels = ["GPT-3.5", "GPT-4", "GPT-4o"];
-
 function ChatPage() {
   const { id } = useParams();
   const [moduleId] = useState(id);
@@ -17,9 +15,11 @@ function ChatPage() {
   const [chats, setChats] = useState([]); // Sidebar chat list
   const [selectedChatId, setSelectedChatId] = useState(null);
   const [input, setInput] = useState("");
-  const [selectedModel, setSelectedModel] = useState(mockModels[0]);
+  const [modelDetails, setModelDetails] = useState(null);
   const [loading, setLoading] = useState(false);
   const [userId] = useState(user.userID); // assume user.userID exists
+  const [assignmentCredits, setAssignmentCredits] = useState(null);
+  const [lastCost, setLastCost] = useState(null);
 
   // Ref for scrolling to bottom of the messages area
   const messagesEndRef = useRef(null);
@@ -29,6 +29,25 @@ function ChatPage() {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  useEffect(() => {
+    async function fetchModelDetails() {
+      try {
+        const res = await fetch(
+          `http://localhost:5000/api/get-module-model/${moduleId}`
+        );
+        const data = await res.json();
+        if (res.ok) {
+          setModelDetails(data);
+        } else {
+          console.error("Error fetching model details:", data.error);
+        }
+      } catch (err) {
+        console.error("Error fetching model details:", err);
+      }
+    }
+    fetchModelDetails();
+  }, [moduleId]);
 
   // load existing chats.
   useEffect(() => {
@@ -62,29 +81,26 @@ function ChatPage() {
     }
   }, [selectedChatId]);
 
-  
   useEffect(() => {
     scrollToBottom();
   }, [selectedChatId, chats]);
 
-  
   useEffect(() => {
     if (inputRef.current) {
       inputRef.current.focus();
     }
   }, []);
 
-  
   useEffect(() => {
     if (!loading && inputRef.current) {
       inputRef.current.focus();
     }
   }, [loading]);
 
-  
   const handleNewChat = () => {
     setSelectedChatId(null);
     setInput("");
+    setLastCost(null);
   };
 
   // When sending a message.
@@ -96,7 +112,7 @@ function ChatPage() {
     if (!currentChatId) {
       // For new chat, create a temp chat.
       const newChat = {
-        id: null, 
+        id: null,
         title: "New Chat",
         messages: [],
       };
@@ -133,7 +149,7 @@ function ChatPage() {
     // Prepare payload: include user_id if no chat exists.
     const payload = {
       chat_id: selectedChatId ? selectedChatId : null,
-      user_id: selectedChatId ? undefined : userId,
+      user_id: userId,
       module_id: moduleId,
       message: messageToSend,
       // model: selectedModel,
@@ -147,6 +163,10 @@ function ChatPage() {
       });
       const data = await response.json();
       if (response.ok) {
+        if (data.cost) {
+          setAssignmentCredits((prev) => prev - data.cost);
+          setLastCost(data.cost);
+        }
         const updatedChatId = data.chat_id;
         setChats((prevChats) =>
           prevChats.map((chat) => {
@@ -185,9 +205,31 @@ function ChatPage() {
     setLoading(false);
   };
 
-  const handleSelectChat = (id) => setSelectedChatId(id);
+  const handleSelectChat = (id) => {
+    setSelectedChatId(id);
+    setLastCost(null);
+  };
 
   const selectedChat = chats.find((chat) => chat.id === selectedChatId);
+
+  // Fetch assignment credits for this user and module
+  useEffect(() => {
+    async function fetchCredits() {
+      try {
+        const res = await fetch(
+          `http://localhost:5000/api/students-in-module/${moduleId}`
+        );
+        const data = await res.json();
+        // Find the assignment for this user by comparing the correct IDs
+        const assignment = data.find((a) => a.userID === userId);
+        setAssignmentCredits(assignment ? assignment.studentCredits : null);
+      } catch (err) {
+        console.error("Error while sending message:", err);
+        setAssignmentCredits(null);
+      }
+    }
+    fetchCredits();
+  }, [moduleId, userId]);
 
   return (
     <div
@@ -259,26 +301,29 @@ function ChatPage() {
             gap: 16,
           }}
         >
-          <label>
+          <div>
             Model:{" "}
-            <select
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
-              style={{ padding: "0.25rem 0.5rem", borderRadius: 4 }}
-            >
-              {mockModels.map((model) => (
-                <option key={model} value={model}>
-                  {model}
-                </option>
-              ))}
-            </select>
-          </label>
+            <span style={{ fontWeight: "bold" }}>
+              {modelDetails ? `${modelDetails.model_name}` : "Loading..."}
+            </span>
+          </div>
+          {/* Show assignment credits next to model */}
+          <span style={{ marginLeft: 16, fontWeight: 500, color: "#000000" }}>
+            Credits:{" "}
+            {assignmentCredits !== null ? assignmentCredits.toFixed(5) : "..."}{" "}
+            USD
+            {lastCost > 0 && (
+              <span style={{ color: "red", marginLeft: "8px" }}>
+                (-{lastCost.toFixed(5)})
+              </span>
+            )}
+          </span>
         </div>
 
         {/* Chat messages area */}
         <div
           style={{
-            flex: 1, 
+            flex: 1,
             overflowY: "auto",
             padding: "2rem",
             display: "flex",
