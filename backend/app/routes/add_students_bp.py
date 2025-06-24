@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from app.models.users import User
 from app.models.module_assignment import ModuleAssignment
 from app.models.students import Student
-from app.models.module import Module 
+from app.models.module import Module
 from app.db import db
 import csv
 from io import TextIOWrapper
@@ -20,30 +20,29 @@ def enroll_single_student():
         return jsonify({'error': 'Missing studentID or moduleID'}), 400
 
     try:
-        # Step 1: Check student exists in Students table
+        # Check if student exists in Students table
         student = Student.query.filter_by(studentID=student_id).first()
         if not student:
             return jsonify({'error': f'Student ID {student_id} not found'}), 404
 
-        # Step 2: Check if user already exists in User table, else create
+        # Check if user exists in User table
         user = User.query.filter_by(studentID=student_id).first()
         if not user:
             user = User(
                 name=student.fullName,
                 studentID=student_id,
-                email=student.email, 
-                password="teststudent",  
+                email=student.email,
+                password="teststudent",
                 role="Student"
             )
             db.session.add(user)
-            db.session.flush()  # To generate userID before assignment
+            db.session.flush()  # Get userID
 
-        # Step 3: Check if already assigned
+        # Check if already enrolled
         existing = ModuleAssignment.query.filter_by(userID=user.userID, moduleID=module_id).first()
         if existing:
             return jsonify({'error': 'Student already enrolled in this module'}), 400
 
-        # Step 4: Get module and use initial credit
         module = Module.query.filter_by(moduleID=module_id).first()
         if not module:
             return jsonify({'error': f'Module {module_id} not found'}), 404
@@ -63,7 +62,6 @@ def enroll_single_student():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-
 # 🔹 Enroll multiple students from CSV
 @add_students_bp.route('/enroll-students-csv', methods=['POST'])
 def enroll_students_csv():
@@ -77,7 +75,6 @@ def enroll_students_csv():
         return jsonify({'error': 'Missing module ID'}), 400
 
     try:
-        # 🔸 Get module and initial credit
         module = Module.query.filter_by(moduleID=module_id).first()
         if not module:
             return jsonify({'error': f'Module {module_id} not found'}), 404
@@ -97,15 +94,20 @@ def enroll_students_csv():
 
             name, student_id = row[0].strip(), row[1].strip()
             if not student_id.isdigit():
-                skipped.append(f"Invalid ID: {student_id}")
+                skipped.append(f"Invalid ID format: {student_id}")
+                continue
+
+            student = Student.query.filter_by(studentID=student_id).first()
+            if not student:
+                skipped.append(f"Student ID not found: {student_id}")
                 continue
 
             user = User.query.filter_by(studentID=student_id).first()
             if not user:
                 user = User(
-                    name=name,
+                    name=student.fullName,
                     studentID=student_id,
-                    email=f"{student_id}@sit.singaporetech.edu.sg",
+                    email=student.email,
                     password="teststudent",
                     role="Student"
                 )
@@ -113,15 +115,16 @@ def enroll_students_csv():
                 db.session.flush()
 
             existing = ModuleAssignment.query.filter_by(userID=user.userID, moduleID=module_id).first()
-            if not existing:
-                db.session.add(ModuleAssignment(
-                    userID=user.userID,
-                    moduleID=module_id,
-                    studentCredits=module.initialCredit
-                ))
-                count += 1
-            else:
+            if existing:
                 skipped.append(f"Already enrolled: {student_id}")
+                continue
+
+            db.session.add(ModuleAssignment(
+                userID=user.userID,
+                moduleID=module_id,
+                studentCredits=module.initialCredit
+            ))
+            count += 1
 
         db.session.commit()
         return jsonify({
@@ -132,7 +135,6 @@ def enroll_students_csv():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
-
 
 # 🔹 Get all students in a module
 @add_students_bp.route('/students-in-module/<module_id>', methods=['GET'])
@@ -155,7 +157,6 @@ def get_students_in_module(module_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-
 # 🔹 Delete an assignment
 @add_students_bp.route('/delete-assignment/<int:assignment_id>', methods=['DELETE'])
 def delete_assignment(assignment_id):
@@ -170,7 +171,6 @@ def delete_assignment(assignment_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
-
 
 # 🔹 Search students
 @add_students_bp.route('/search-students', methods=['GET'])

@@ -121,27 +121,39 @@ export default function ManageModules({ setModal }) {
   }
 
   async function handleCsvUpload() {
-    if (!csvFile) return;
+  if (!csvFile) return;
 
-    const formData = new FormData();
-    formData.append("file", csvFile);
-    formData.append("moduleID", selectedModule.moduleID);
+  const formData = new FormData();
+  formData.append("file", csvFile);
+  formData.append("moduleID", selectedModule.moduleID);
 
-    try {
-      const response = await fetch("http://localhost:5000/api/enroll-students-csv", {
-        method: "POST",
-        body: formData,
-      });
+  try {
+    const response = await fetch("http://localhost:5000/api/enroll-students-csv", {
+      method: "POST",
+      body: formData,
+    });
 
-      if (!response.ok) throw new Error("Failed to upload CSV");
-      setModal({ active: true, type: "success", message: "Students uploaded via CSV!" });
-      setCsvFile(null);
-      setShowPanel(false);
-      setRefreshStudents((prev) => prev + 1);
-    } catch (err) {
-      setModal({ active: true, type: "fail", message: err.message });
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to upload CSV");
     }
+
+    // Construct message: success count and skipped items
+    let message = `${data.message}`;
+    if (data.skipped && data.skipped.length > 0) {
+      message += `\n\nSome entries were skipped:\n${data.skipped.join("\n")}`;
+    }
+
+    setModal({ active: true, type: "success", message });
+    setCsvFile(null);
+    setShowPanel(false);
+    setRefreshStudents((prev) => prev + 1);
+  } catch (err) {
+    setModal({ active: true, type: "fail", message: err.message });
   }
+}
+
 
   async function onModuleUpdated() {
     const updatedModules = await fetchUserAssignedModules();
