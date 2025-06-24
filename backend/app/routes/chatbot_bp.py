@@ -232,16 +232,8 @@ def send_message():
         model_override = data.get("model")
         user_id = data.get("user_id")  
 
-        if not module_id or not user_message:
-            return jsonify({"error": "module_id and message are required"}), 400
-
         # For the first message, create a new chat session.
         if not chat_id:
-            if not user_id:
-                return jsonify({"error": "user_id is required for first message"}), 400
-            assignment = ModuleAssignment.query.filter_by(userID=user_id, moduleID=str(module_id)).first()
-            if not assignment:
-                return jsonify({"error": "No assignment found for the given user and module"}), 404
             new_chat = ChatHistory(
                 assignmentID=assignment.assignmentID,
                 chatlog="",  # Will be replaced.
@@ -251,6 +243,7 @@ def send_message():
             db.session.commit()
             chat_id = new_chat.historyID
             chat_session = new_chat
+        # If there's existing chat
         else:
             chat_session = ChatHistory.query.filter_by(historyID=chat_id).first()
             if not chat_session:
@@ -417,8 +410,6 @@ def send_message():
             content=user_message,
             timestamp=datetime.utcnow()
         )
-        db.session.add(user_msg)
-        db.session.commit()
 
         # Save the bot's response.
         bot_msg = ChatMessage(
@@ -427,6 +418,8 @@ def send_message():
             content=bot_response,
             timestamp=datetime.utcnow()
         )
+        
+        db.session.add(user_msg)
         db.session.add(bot_msg)
         db.session.commit()
 
