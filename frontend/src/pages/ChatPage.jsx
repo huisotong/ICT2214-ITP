@@ -20,6 +20,7 @@ function ChatPage() {
   const [selectedModel, setSelectedModel] = useState(mockModels[0]);
   const [loading, setLoading] = useState(false);
   const [userId] = useState(user.userID); // assume user.userID exists
+  const [assignmentCredits, setAssignmentCredits] = useState(null);
 
   // Ref for scrolling to bottom of the messages area
   const messagesEndRef = useRef(null);
@@ -189,6 +190,22 @@ function ChatPage() {
 
   const selectedChat = chats.find((chat) => chat.id === selectedChatId);
 
+  // Fetch assignment credits for this user and module
+  useEffect(() => {
+    async function fetchCredits() {
+      try {
+        const res = await fetch(`http://localhost:5000/api/students-in-module/${moduleId}`);
+        const data = await res.json();
+        // Find the assignment for this user by comparing the correct IDs
+        const assignment = data.find((a) => a.userID === userId);
+        setAssignmentCredits(assignment ? assignment.studentCredits : null);
+      } catch (err) {
+        setAssignmentCredits(null);
+      }
+    }
+    fetchCredits();
+  }, [moduleId, userId]);
+
   return (
     <div
       style={{
@@ -273,6 +290,10 @@ function ChatPage() {
               ))}
             </select>
           </label>
+          {/* Show assignment credits next to model */}
+          <span style={{ marginLeft: 16, fontWeight: 500, color: '#000000' }}>
+            Credits: {assignmentCredits !== null ? assignmentCredits.toFixed(2) : '...'} USD
+          </span>
         </div>
 
         {/* Chat messages area */}
