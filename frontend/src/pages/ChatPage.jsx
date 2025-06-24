@@ -7,8 +7,6 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 
-const mockModels = ["GPT-3.5", "GPT-4", "GPT-4o"];
-
 function ChatPage() {
   const { id } = useParams();
   const [moduleId] = useState(id);
@@ -17,10 +15,11 @@ function ChatPage() {
   const [chats, setChats] = useState([]); // Sidebar chat list
   const [selectedChatId, setSelectedChatId] = useState(null);
   const [input, setInput] = useState("");
-  const [selectedModel, setSelectedModel] = useState(mockModels[0]);
+  const [modelDetails, setModelDetails] = useState(null);
   const [loading, setLoading] = useState(false);
   const [userId] = useState(user.userID); // assume user.userID exists
   const [assignmentCredits, setAssignmentCredits] = useState(null);
+  const [lastCost, setLastCost] = useState(null);
 
   // Ref for scrolling to bottom of the messages area
   const messagesEndRef = useRef(null);
@@ -30,6 +29,25 @@ function ChatPage() {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  useEffect(() => {
+    async function fetchModelDetails() {
+      try {
+        const res = await fetch(
+          `http://localhost:5000/api/get-module-model/${moduleId}`
+        );
+        const data = await res.json();
+        if (res.ok) {
+          setModelDetails(data);
+        } else {
+          console.error("Error fetching model details:", data.error);
+        }
+      } catch (err) {
+        console.error("Error fetching model details:", err);
+      }
+    }
+    fetchModelDetails();
+  }, [moduleId]);
 
   // load existing chats.
   useEffect(() => {
@@ -86,6 +104,7 @@ function ChatPage() {
   const handleNewChat = () => {
     setSelectedChatId(null);
     setInput("");
+    setLastCost(null);
   };
 
   // When sending a message.
@@ -134,7 +153,7 @@ function ChatPage() {
     // Prepare payload: include user_id if no chat exists.
     const payload = {
       chat_id: selectedChatId ? selectedChatId : null,
-      user_id: selectedChatId ? undefined : userId,
+      user_id: userId,
       module_id: moduleId,
       message: messageToSend,
       // model: selectedModel,
@@ -148,6 +167,10 @@ function ChatPage() {
       });
       const data = await response.json();
       if (response.ok) {
+        if (data.cost) {
+          setAssignmentCredits((prev) => prev - data.cost);
+          setLastCost(data.cost);
+        }
         const updatedChatId = data.chat_id;
         setChats((prevChats) =>
           prevChats.map((chat) => {
@@ -186,7 +209,10 @@ function ChatPage() {
     setLoading(false);
   };
 
-  const handleSelectChat = (id) => setSelectedChatId(id);
+  const handleSelectChat = (id) => {
+    setSelectedChatId(id);
+    setLastCost(null);
+  };
 
   const selectedChat = chats.find((chat) => chat.id === selectedChatId);
 
@@ -276,23 +302,22 @@ function ChatPage() {
             gap: 16,
           }}
         >
-          <label>
+          <div>
             Model:{" "}
-            <select
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
-              style={{ padding: "0.25rem 0.5rem", borderRadius: 4 }}
-            >
-              {mockModels.map((model) => (
-                <option key={model} value={model}>
-                  {model}
-                </option>
-              ))}
-            </select>
-          </label>
+            <span style={{ fontWeight: "bold" }}>
+              {modelDetails
+                ? `${modelDetails.model_name}`
+                : "Loading..."}
+            </span>
+          </div>
           {/* Show assignment credits next to model */}
           <span style={{ marginLeft: 16, fontWeight: 500, color: '#000000' }}>
-            Credits: {assignmentCredits !== null ? assignmentCredits.toFixed(2) : '...'} USD
+            Credits: {assignmentCredits !== null ? assignmentCredits.toFixed(9) : '...'} USD
+            {lastCost > 0 && (
+              <span style={{ color: 'red', marginLeft: '8px' }}>
+                (-{lastCost.toFixed(9)})
+              </span>
+            )}
           </span>
         </div>
 

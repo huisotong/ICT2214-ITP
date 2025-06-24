@@ -16,12 +16,14 @@ from docx import Document
 from io import BytesIO
 import traceback
 from datetime import datetime
+import requests
 from langchain.schema import HumanMessage
 from langchain_openai import ChatOpenAI
 from langchain.chains import ConversationalRetrievalChain
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.callbacks import get_openai_callback
 
 chatbot_bp = Blueprint('chatbot', __name__)
 UPLOAD_FOLDER = Path("uploads")
@@ -38,6 +40,11 @@ def get_qdrant_client():
         timeout=10.0,
         check_compatibility=False
     )
+
+"""
+TODO: redo cost estimation function. 
+(call https://openrouter.ai/api/v1/models, get model pricing, estimate toks, calculate cost)
+"""
 
 # Function to tag document from qdrant
 def tag_document_to_qdrant(module_id: str, file_content: str, filename: str):
@@ -231,16 +238,18 @@ def send_message():
         model_override = data.get("model")
         user_id = data.get("user_id")  
 
-        if not module_id or not user_message:
-            return jsonify({"error": "module_id and message are required"}), 400
-
+        # Added user_id to the check, for credit deduction
+        if not module_id or not user_message or not user_id:
+            return jsonify({"error": "module_id, message, and user_id are required"}), 400
+        
+        # Fetch user assignment and settings early for access to credits and model name
+        assignment = ModuleAssignment.query.filter_by(userID=user_id, moduleID=str(module_id)).first()
+        if not assignment:
+            return jsonify({"error": "No assignment found for the given user and module"}), 404
+        
+        chat_session = None
         # For the first message, create a new chat session.
         if not chat_id:
-            if not user_id:
-                return jsonify({"error": "user_id is required for first message"}), 400
-            assignment = ModuleAssignment.query.filter_by(userID=user_id, moduleID=str(module_id)).first()
-            if not assignment:
-                return jsonify({"error": "No assignment found for the given user and module"}), 404
             new_chat = ChatHistory(
                 assignmentID=assignment.assignmentID,
                 chatlog="",  # Will be replaced.
@@ -254,14 +263,30 @@ def send_message():
             chat_session = ChatHistory.query.filter_by(historyID=chat_id).first()
             if not chat_session:
                 return jsonify({"error": "Chat session not found"}), 404
-
-        # Get model settings.
+        
         settings = ChatbotSettings.query.filter_by(moduleID=str(module_id)).first()
         if not settings:
             return jsonify({"error": "Model settings not found for this module"}), 404
 
         if model_override:
             settings.model = model_override
+
+        try:
+            models_response = requests.get("https://openrouter.ai/api/v1/models")
+            models_response.raise_for_status()
+            models_data = models_response.json().get("data", [])
+        except requests.exceptions.RequestException as e:
+            print(f"Could not fetch model pricing from OpenRouter: {e}")
+            return jsonify({"error": "Could not fetch model pricing. Please try again."}), 500
+
+        model_info = next((m for m in models_data if m.get("id") == settings.model), None)
+
+        if not model_info:
+            return jsonify({"error": f"Could not find pricing information for model: {settings.model}"}), 500
+
+        pricing = model_info.get("pricing", {})
+        prompt_price = float(pricing.get("prompt", 0))
+        completion_price = float(pricing.get("completion", 0))
 
         if settings.system_prompt:
             system_context = f"System Context: {settings.system_prompt}\n\n"
@@ -359,20 +384,26 @@ def send_message():
                 filename = doc.metadata.get("filename", "Unknown")
                 print(f"📄 SCORE: {score:.4f} — ({filename}) {doc.page_content[:100]}")
 
-            chain = ConversationalRetrievalChain.from_llm(
-                llm=ChatOpenAI(
-                    model_name=settings.model,
-                    temperature=settings.temperature,
-                    max_tokens=settings.max_tokens,
-                    openai_api_key=os.getenv("OPENROUTER_API_KEY"),
-                    openai_api_base=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
-                ),
-                retriever=retriever,
-                return_source_documents=True
-            )
-            chain_input = {"question": system_context + user_message, "chat_history": conversation_history}
-            chain_result = chain.invoke(chain_input)
-            bot_response = chain_result.get("answer", "I'm sorry, I couldn't generate a response.")
+            prompt_tokens = 0
+            completion_tokens = 0
+            
+            with get_openai_callback() as cb:
+                chain = ConversationalRetrievalChain.from_llm(
+                    llm=ChatOpenAI(
+                        model_name=settings.model,
+                        temperature=settings.temperature,
+                        max_tokens=settings.max_tokens,
+                        openai_api_key=os.getenv("OPENROUTER_API_KEY"),
+                        openai_api_base=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+                    ),
+                    retriever=retriever,
+                    return_source_documents=True
+                )
+                chain_input = {"question": system_context + user_message, "chat_history": conversation_history}
+                chain_result = chain.invoke(chain_input)
+                bot_response = chain_result.get("answer", "I'm sorry, I couldn't generate a response.")
+                prompt_tokens = cb.prompt_tokens
+                completion_tokens = cb.completion_tokens
         else:  # No documents: build prompt from conversation_history.
             prompt_text = ""
             prompt_text += system_context
@@ -387,7 +418,19 @@ def send_message():
                 openai_api_key=os.getenv("OPENROUTER_API_KEY"),
                 openai_api_base=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
             )
-            bot_response = llm([HumanMessage(content=prompt_text)]).content
+            llm_result = llm.invoke([HumanMessage(content=prompt_text)])
+            bot_response = llm_result.content
+            token_usage = llm_result.response_metadata.get("token_usage", {})
+            prompt_tokens = token_usage.get("prompt_tokens", 0)
+            completion_tokens = token_usage.get("completion_tokens", 0)
+
+
+        # Calculate cost and deduct from the student's credit balance
+        cost = ((prompt_tokens / 1000) * prompt_price) + ((completion_tokens / 1000) * completion_price)
+        print("Cost of this request:", cost)
+        print("Student credit before deduction:", assignment.studentCredits)
+        assignment.studentCredits -= cost
+        print("Student credit after deduction:", assignment.studentCredits)
 
         # Save the user's message.
         user_msg = ChatMessage(
@@ -396,9 +439,7 @@ def send_message():
             content=user_message,
             timestamp=datetime.utcnow()
         )
-        db.session.add(user_msg)
-        db.session.commit()
-
+        
         # Save the bot's response.
         bot_msg = ChatMessage(
             chatID=chat_id,
@@ -406,6 +447,10 @@ def send_message():
             content=bot_response,
             timestamp=datetime.utcnow()
         )
+
+        # Add all changes to the session and commit once.
+        db.session.add(assignment)
+        db.session.add(user_msg)
         db.session.add(bot_msg)
         db.session.commit()
 
@@ -414,7 +459,8 @@ def send_message():
             "chat_id": chat_id,
             "user_message": user_message,
             "bot_response": bot_response,
-            "chat_title": chat_session.chatlog
+            "chat_title": chat_session.chatlog,
+            "cost": cost
         }), 200
 
     except Exception as e:
@@ -492,3 +538,15 @@ def get_chat_message(chat_id):
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+@chatbot_bp.route("/get-module-model/<string:module_id>", methods=["GET"])
+def get_module_model(module_id):
+    chatbot_settings = ChatbotSettings.query.filter_by(moduleID=str(module_id)).first()
+    if not chatbot_settings:
+        return jsonify({"error": "Chatbot settings not found for this module"}), 404
+
+    return jsonify(
+        {
+            "model_name": chatbot_settings.model,
+        }
+    )
