@@ -22,6 +22,7 @@ from langchain.chains import ConversationalRetrievalChain
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.prompts import PromptTemplate
 
 chatbot_bp = Blueprint('chatbot', __name__)
 UPLOAD_FOLDER = Path("uploads")
@@ -60,7 +61,7 @@ def tag_document_to_qdrant(module_id: str, file_content: str, filename: str):
     point = PointStruct(
         id=point_id,
         vector=vector,
-        payload={"filename": filename, "text": file_content}
+        payload={"filename": filename, "page_content": file_content}
     )
 
     print("📌 Point created, sending to Qdrant...")
@@ -303,6 +304,10 @@ def send_message():
             )
             title_response = llm_for_title.invoke([HumanMessage(content=title_prompt)])
             chat_title = title_response.content.strip()
+            if chat_title.startswith('"') and chat_title.endswith('"'):
+                chat_title = chat_title[1:-1].strip()
+            elif chat_title.startswith("'") and chat_title.endswith("'"):
+                chat_title = chat_title[1:-1].strip()
             # Save the generated title only once.
             chat_session.chatlog = chat_title
             db.session.commit()
@@ -336,10 +341,21 @@ def send_message():
             )
             retriever = vectorstore.as_retriever(
                 search_kwargs={
-                    "k": 20,  # Increase how many to return
+                    "k": 1,  # Increase how many to return
                     "score_threshold": 0.5  # Accept even loosely matched chunks
                 }
             )
+            prompt_template = PromptTemplate(
+                input_variables=["context", "question"],
+                template="""
+                You are a helpful assistant. Use the following context to answer the question.
+
+                Context:
+                {context}
+
+                Question: {question}
+                """
+                            )
             # Run similarity search
             docs_and_scores = vectorstore.similarity_search_with_score(user_message, k=10)
 
@@ -358,7 +374,8 @@ def send_message():
             for doc, score in docs_and_scores:
                 filename = doc.metadata.get("filename", "Unknown")
                 print(f"📄 SCORE: {score:.4f} — ({filename}) {doc.page_content[:100]}")
-
+            
+                
             chain = ConversationalRetrievalChain.from_llm(
                 llm=ChatOpenAI(
                     model_name=settings.model,
@@ -368,9 +385,13 @@ def send_message():
                     openai_api_base=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
                 ),
                 retriever=retriever,
-                return_source_documents=True
+                return_source_documents=True,
+                combine_docs_chain_kwargs={"prompt": prompt_template}
             )
-            chain_input = {"question": system_context + user_message, "chat_history": conversation_history}
+            chain_input = {
+                "question": system_context + user_message, 
+                "chat_history": conversation_history
+            }
             chain_result = chain.invoke(chain_input)
             bot_response = chain_result.get("answer", "I'm sorry, I couldn't generate a response.")
         else:  # No documents: build prompt from conversation_history.
