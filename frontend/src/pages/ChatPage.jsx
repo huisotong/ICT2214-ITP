@@ -260,16 +260,16 @@ function ChatPage() {
           <div>
             Model:{" "}
             <span style={{ fontWeight: "bold" }}>
-              {modelDetails
-                ? `${modelDetails.model_name}`
-                : "Loading..."}
+              {modelDetails ? `${modelDetails.model_name}` : "Loading..."}
             </span>
           </div>
           {/* Show assignment credits next to model */}
-          <span style={{ marginLeft: 16, fontWeight: 500, color: '#000000' }}>
-            Credits: {assignmentCredits !== null ? assignmentCredits.toFixed(5) : '...'} USD
+          <span style={{ marginLeft: 16, fontWeight: 500, color: "#000000" }}>
+            Credits:{" "}
+            {assignmentCredits !== null ? assignmentCredits.toFixed(5) : "..."}{" "}
+            USD
             {lastCost > 0 && (
-              <span style={{ color: 'red', marginLeft: '8px' }}>
+              <span className={styles.creditsCost}>
                 (-{lastCost.toFixed(5)})
               </span>
             )}
