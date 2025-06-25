@@ -70,7 +70,9 @@ def add_module():
         new_module = Module(
             moduleID=module_id,
             moduleName=module_name,
-            moduleDesc=module_description
+            moduleDesc=module_description,
+            initialCredit=initial_credit 
+
         )
         db.session.add(new_module)
         

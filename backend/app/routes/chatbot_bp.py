@@ -297,7 +297,6 @@ def send_message():
             return jsonify({"error": "No assignment found for the given user and module"}), 404
         
         chat_session = None
-
         # For the first message, create a new chat session.
         if not chat_id:
             new_chat = ChatHistory(
@@ -315,8 +314,7 @@ def send_message():
             chat_session = ChatHistory.query.filter_by(historyID=chat_id).first()
             if not chat_session:
                 return jsonify({"error": "Chat session not found"}), 404
-
-        # Get model settings.
+        
         settings = ChatbotSettings.query.filter_by(moduleID=str(module_id)).first()
         if not settings:
             return jsonify({"error": "Model settings not found for this module"}), 404
@@ -448,10 +446,7 @@ def send_message():
                     return_source_documents=True,
                     combine_docs_chain_kwargs={"prompt": prompt_template}
                 )
-                chain_input = {
-                    "question": system_context + user_message, 
-                    "chat_history": conversation_history
-                }
+                chain_input = {"question": system_context + user_message, "chat_history": conversation_history}
                 chain_result = chain.invoke(chain_input)
                 bot_response = chain_result.get("answer", "I'm sorry, I couldn't generate a response.")
                 prompt_tokens = cb.prompt_tokens
@@ -494,7 +489,6 @@ def send_message():
             content=user_message,
             timestamp=datetime.utcnow()
         )
-
         # Save the bot's response.
         bot_msg = ChatMessage(
             chatID=chat_id,

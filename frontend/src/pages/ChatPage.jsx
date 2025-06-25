@@ -17,10 +17,9 @@ function ChatPage() {
   const [input, setInput] = useState("");
   const [modelDetails, setModelDetails] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [userId] = useState(user.userID);
+  const [userId] = useState(user.userID); // assume user.userID exists
   const [assignmentCredits, setAssignmentCredits] = useState(null);
   const [lastCost, setLastCost] = useState(null);
-
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -48,6 +47,7 @@ function ChatPage() {
     fetchModelDetails();
   }, [moduleId]);
 
+  // load existing chats.
   useEffect(() => {
     fetch(`http://localhost:5000/api/get-chat-history/${userId}/${moduleId}`)
       .then((res) => res.json())
@@ -247,11 +247,22 @@ function ChatPage() {
       {/* Main Chat Area */}
       <section className={styles.mainSection}>
         {/* Top Bar: Model Selection */}
-        <div className={styles.topBar}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            padding: "1rem",
+            borderBottom: "1px solid #e5e7eb",
+            background: "#f9fafb",
+            gap: 16,
+          }}
+        >
           <div>
             Model:{" "}
-            <span className={styles.modelName}>
-              {modelDetails ? `${modelDetails.model_name}` : "Loading..."}
+            <span style={{ fontWeight: "bold" }}>
+              {modelDetails
+                ? `${modelDetails.model_name}`
+                : "Loading..."}
             </span>
           </div>
           {/* Show assignment credits next to model */}
