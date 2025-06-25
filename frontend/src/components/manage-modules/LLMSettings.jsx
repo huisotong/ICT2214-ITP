@@ -148,6 +148,7 @@ export default function LLMSettings({ module, setModal, refreshTrigger }) {
 
       // Update available documents
       setAvailableDocuments(data.documents);
+      console.log("📄 Available documents:", data.documents);
     } catch (error) {
       console.error("Error fetching settings:", error);
       toast.error("Failed to fetch settings");

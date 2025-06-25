@@ -12,12 +12,13 @@ from qdrant_client.models import Distance, VectorParams, PointStruct, PointIdsLi
 import os
 import uuid
 from dotenv import load_dotenv
-from docx import Document 
+from docx import Document as DocxDocument
 from io import BytesIO
 import traceback
 from datetime import datetime
 import requests
 from langchain.schema import HumanMessage
+from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI
 from langchain.chains import ConversationalRetrievalChain
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -44,42 +45,90 @@ def get_qdrant_client():
 
 # Function to tag document from qdrant
 def tag_document_to_qdrant(module_id: str, file_content: str, filename: str):
+    # Step 1: Initialize embedding model and text splitter
     embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-base-en-v1.5")
-    vector = embeddings.embed_documents([file_content])[0]
-    vector_size = len(vector)
-    
+    splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
+
+    # Step 2: Split file content into manageable chunks
+    chunks = splitter.split_text(file_content)
+
+    # Step 3: Wrap each chunk into a LangChain Document, attach filename as metadata
+    documents = [
+        Document(page_content=chunk, metadata={"filename": filename})
+        for chunk in chunks
+    ]
+
+    # Step 4: Connect to Qdrant vector database
     client = get_qdrant_client()
     collection_name = f"module_{module_id}"
 
-    # Create collection if missing
+    # Step 5: Create collection if it doesn't exist yet
     if collection_name not in [c.name for c in client.get_collections().collections]:
+        dummy_vector = embeddings.embed_documents(["test"])[0]
         client.recreate_collection(
             collection_name=collection_name,
-            vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE)
+            vectors_config=VectorParams(size=len(dummy_vector), distance=Distance.COSINE)
         )
 
-    point_id = str(uuid.uuid4())
-
-    point = PointStruct(
-        id=point_id,
-        vector=vector,
-        payload={"filename": filename, "page_content": file_content}
+    # Step 6: Add documents to the vector store
+    print(f"📤 Uploading {len(documents)} documents to Qdrant...")
+    vectorstore = QdrantVectorStore(
+        client=client,
+        collection_name=collection_name,
+        embedding=embeddings
     )
+    vectorstore.add_documents(documents)
+    print("✅ Tagging completed successfully.")
 
-    print("📌 Point created, sending to Qdrant...")
-    result = client.upsert(collection_name=collection_name, points=[point])
-    print("Qdrant upsert result:", result)
+    # Step 7: Return list of filenames tagged (same repeated filename for each chunk)
+    return [str(doc.metadata["filename"]) for doc in documents]
 
-    return point_id
 
 # Function to untag document from qdrant
-def untag_document_from_qdrant(module_id: str, point_id: str):
+def untag_document_from_qdrant(module_id: str, filename: str):
     client = get_qdrant_client()
     collection_name = f"module_{module_id}"
 
-    print(f"🧹 Removing point {point_id} from collection {collection_name}...")
-    result = client.delete(collection_name=collection_name,points_selector=PointIdsList(points=[point_id]))
-    print("🗑️ Qdrant delete result:", result)
+    print(f"🧹 Removing all points for file '{filename}' from collection '{collection_name}'...")
+
+    try:
+        # Step 1: Retrieve all vectors and their payloads from the specified collection
+        scroll_result = client.scroll(
+            collection_name=collection_name,
+            with_payload=True,
+            limit=1000  # May increase if you expect very large files
+        )
+    except Exception as e:
+        print(f"❌ Failed to scroll Qdrant collection: {e}")
+        return
+
+    all_docs = scroll_result[0]
+    matching_ids = []
+
+    # Step 2: Check for filename in both flat and nested payload structures
+    for doc in all_docs:
+        filename_flat = doc.payload.get("filename")
+        filename_nested = doc.payload.get("metadata", {}).get("filename")
+
+        if filename_flat == filename:
+            print(f"✅ Matched flat filename: {filename_flat}")
+            matching_ids.append(str(doc.id))
+        elif filename_nested == filename:
+            print(f"✅ Matched nested filename: {filename_nested}")
+            matching_ids.append(str(doc.id))
+
+    if not matching_ids:
+        print("⚠️ No points found with that filename.")
+        return
+
+    # Step 3: Delete all points that matched the filename
+    result = client.delete(
+        collection_name=collection_name,
+        points_selector=PointIdsList(points=matching_ids)
+    )
+
+    print(f"🗑️ Deleted {len(matching_ids)} points. Qdrant response:", result)
+
 
 @chatbot_bp.route('/get-model-settings/<module_id>', methods=['GET'])
 def get_model_settings(module_id):
@@ -92,22 +141,28 @@ def get_model_settings(module_id):
         # Initialize Qdrant client (need change depending on setup)
         client = get_qdrant_client()
         collection_name = f"module_{module_id}"
-
+        filenames = []
         try:
             # Get all documents from the module's collection
-            documents = client.scroll(
-                collection_name=collection_name,
-            )[0]
+            documents = client.scroll(collection_name=collection_name, with_payload=True, limit=1000)[0]
+             # Extract filenames from flat or nested metadata
+            for doc in documents:
+                flat_name = doc.payload.get("filename")
+                nested_name = doc.payload.get("metadata", {}).get("filename")
+                name = flat_name or nested_name
 
-            # Format documents for frontend
-            formatted_docs = [{
-                'id': str(doc.id),
-                'name': doc.payload.get('filename'),
-            } for doc in documents]
+                if name:
+                    name = name.strip()
+                    if name not in filenames:
+                        filenames.append(name)
+                    print(f"✅ Found filename: {name}")
+                else:
+                    print(f"⚠️ Skipped point without filename. Point ID: {doc.id}")
+
 
         except Exception as e:
             print(f"Error fetching from Qdrant: {str(e)}")
-            formatted_docs = []
+            filenames = []
 
         return jsonify({
             'settings': {
@@ -116,7 +171,7 @@ def get_model_settings(module_id):
                 'systemPrompt': settings.system_prompt,
                 'maxTokens': settings.max_tokens,
             },
-            'documents': formatted_docs
+            "documents": [{"id": name, "name": name} for name in filenames]
         }), 200
         
     except Exception as e:
@@ -166,32 +221,25 @@ def tag_document():
         if not module_id or not file:
             return jsonify({"error": "Missing moduleID or file"}), 400
 
-        # Can handle .txt / .docx currently, need add more
+        # Step 1: Read uploaded DOCX or plain text content
         if file.filename.lower().endswith(".docx"):
             docx_io = BytesIO(file.read())
-            doc = Document(docx_io)
+            doc = DocxDocument(docx_io)
             content = "\n".join([para.text for para in doc.paragraphs])
         else:
             content = file.read().decode("utf-8")
 
-        # Chunk the content into 500-character chunks with 50-character overlap
-        splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
-        chunks = splitter.split_text(content)
-
-        if not chunks:
+        if not content.strip():
             return jsonify({"error": "No content extracted from file"}), 400
 
-        point_ids = []
-        for i, chunk in enumerate(chunks):
-            part_filename = f"{file.filename} - Part {i+1}"
-            point_id = tag_document_to_qdrant(module_id, chunk, part_filename)
-            point_ids.append(point_id)
+         # Step 2: Tag content into Qdrant via embedding and splitting
+        part_filenames = tag_document_to_qdrant(module_id, content, file.filename)
 
         return jsonify({
             "status": "success",
-            "point_id": point_id,
             "filename": file.filename,
-            "num_chunks": len(chunks)
+            "num_chunks": len(part_filenames),
+            "chunks": part_filenames
         }), 200
 
     except Exception as e:
@@ -207,20 +255,19 @@ def untag_document():
         print("📥 Received request to /untag-document")
         data = request.get_json()
         module_id = data.get("moduleID")
-        doc_id = data.get("docID")
+        filename = data.get("docID")  # Must match the filename stored in metadata
 
-        if not module_id or not doc_id:
-            return jsonify({"error": "Missing moduleID or docID"}), 400
+        if not module_id or not filename:
+            return jsonify({"error": "Missing moduleID or filename"}), 400
 
-        untag_document_from_qdrant(module_id, doc_id)
+        # Step 1: Call helper to remove all matching Qdrant chunks
+        untag_document_from_qdrant(module_id, filename)
 
         return jsonify({"status": "success"}), 200
 
     except Exception as e:
         print("❌ EXCEPTION in /untag-document route:", str(e))
         return jsonify({"error": str(e)}), 500
-
-
 
 
 @chatbot_bp.route('/send-message', methods=['POST'])
@@ -376,12 +423,6 @@ def send_message():
 
             # Print similarity score and filename from metadata
             for doc, score in docs_and_scores:
-                # Try to extract filename from internal `_Document` object
-                if not doc.metadata.get("filename"):
-                    raw_filename = getattr(doc, 'metadata', {}).get('__original__', {}).get('payload', {}).get('filename')
-                    if raw_filename:
-                        doc.metadata['filename'] = raw_filename
-
                 filename = doc.metadata.get("filename", "Unknown")
                 print(f"📄 SCORE: {score:.4f} — ({filename}) {doc.page_content[:100]}")
 
