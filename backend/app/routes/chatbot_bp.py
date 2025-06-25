@@ -345,18 +345,9 @@ def send_message():
         except Exception as q_err:
             print(f"Error fetching documents from Qdrant: {str(q_err)}")
             documents = []
-        texts = []
-        metadatas = []
-        for doc in documents:
-            text_content = doc.payload.get("text", "")
-            texts.append(text_content)
-            metadatas.append({
-                "id": str(doc.id),  
-                "filename": doc.payload.get("filename")
-            })
 
         # Generate the bot response.
-        if texts:  # When documents exist, use the ConversationalRetrievalChain.
+        if documents:  # When documents exist, use the ConversationalRetrievalChain.
             embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-base-en-v1.5")
             vectorstore = QdrantVectorStore(
                 client=client,
@@ -365,7 +356,7 @@ def send_message():
             )
             retriever = vectorstore.as_retriever(
                 search_kwargs={
-                    "k": 1,  # Increase how many to return
+                    "k": 3,  # Increase how many to return
                     "score_threshold": 0.5  # Accept even loosely matched chunks
                 }
             )
@@ -381,23 +372,19 @@ def send_message():
                 """
                             )
             # Run similarity search
-            docs_and_scores = vectorstore.similarity_search_with_score(user_message, k=10)
+            docs_and_scores = vectorstore.similarity_search_with_score(user_message, k=3)
 
-            # 🔧 Flatten filename from nested metadata
-            for doc, _ in docs_and_scores:
-                if '__original__' in doc.metadata:
-                    original = doc.metadata['__original__']
-                    if isinstance(original, dict):
-                        payload = original.get('payload', {})
-                        if isinstance(payload, dict):
-                            filename = payload.get('filename')
-                            if filename:
-                                doc.metadata['filename'] = filename  # Promote to top-level
-
-            # ✅ Print each doc's score and filename
+            # Print similarity score and filename from metadata
             for doc, score in docs_and_scores:
+                # Try to extract filename from internal `_Document` object
+                if not doc.metadata.get("filename"):
+                    raw_filename = getattr(doc, 'metadata', {}).get('__original__', {}).get('payload', {}).get('filename')
+                    if raw_filename:
+                        doc.metadata['filename'] = raw_filename
+
                 filename = doc.metadata.get("filename", "Unknown")
                 print(f"📄 SCORE: {score:.4f} — ({filename}) {doc.page_content[:100]}")
+
 
             prompt_tokens = 0
             completion_tokens = 0
