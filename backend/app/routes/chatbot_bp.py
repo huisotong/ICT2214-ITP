@@ -43,6 +43,12 @@ def get_qdrant_client():
         check_compatibility=False
     )
 
+"""
+TODO: redo cost estimation function. 
+(call https://openrouter.ai/api/v1/models, get model pricing, estimate toks, calculate cost)
+"""
+
+
 # Function to tag document from qdrant
 def tag_document_to_qdrant(module_id: str, file_content: str, filename: str):
     # Step 1: Initialize embedding model and text splitter
@@ -426,7 +432,6 @@ def send_message():
                 filename = doc.metadata.get("filename", "Unknown")
                 print(f"📄 SCORE: {score:.4f} — ({filename}) {doc.page_content[:100]}")
 
-
             prompt_tokens = 0
             completion_tokens = 0
             
@@ -498,6 +503,8 @@ def send_message():
             timestamp=datetime.utcnow()
         )
 
+        # Add all changes to the session and commit once.
+        db.session.add(assignment)
         db.session.add(user_msg)
         db.session.add(bot_msg)
         db.session.commit()

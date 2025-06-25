@@ -21,6 +21,7 @@ function ChatPage() {
   const [assignmentCredits, setAssignmentCredits] = useState(null);
   const [lastCost, setLastCost] = useState(null);
 
+
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -203,17 +204,16 @@ function ChatPage() {
 
   const selectedChat = chats.find((chat) => chat.id === selectedChatId);
 
+  // Fetch assignment credits for this user and module
   useEffect(() => {
     async function fetchCredits() {
       try {
-        const res = await fetch(
-          `http://localhost:5000/api/students-in-module/${moduleId}`
-        );
+        const res = await fetch(`http://localhost:5000/api/students-in-module/${moduleId}`);
         const data = await res.json();
+        // Find the assignment for this user by comparing the correct IDs
         const assignment = data.find((a) => a.userID === userId);
         setAssignmentCredits(assignment ? assignment.studentCredits : null);
       } catch (err) {
-        console.error("Error while sending message:", err);
         setAssignmentCredits(null);
       }
     }
@@ -254,12 +254,11 @@ function ChatPage() {
               {modelDetails ? `${modelDetails.model_name}` : "Loading..."}
             </span>
           </div>
-          <span className={styles.credits}>
-            Credits:{" "}
-            {assignmentCredits !== null ? assignmentCredits.toFixed(5) : "..."}{" "}
-            USD
+          {/* Show assignment credits next to model */}
+          <span style={{ marginLeft: 16, fontWeight: 500, color: '#000000' }}>
+            Credits: {assignmentCredits !== null ? assignmentCredits.toFixed(5) : '...'} USD
             {lastCost > 0 && (
-              <span className={styles.creditsCost}>
+              <span style={{ color: 'red', marginLeft: '8px' }}>
                 (-{lastCost.toFixed(5)})
               </span>
             )}
