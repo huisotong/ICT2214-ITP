@@ -5,9 +5,15 @@ export default function ModuleSettings({
   setModal,
   moduleSettings,
   setModuleSettings,
-  onModuleUpdated,  // added prop
+  onModuleUpdated, // added prop
 }) {
+  const [isSaving, setIsSaving] = useState(false); // Add loading state
+
   async function handleSaveChanges() {
+    if (isSaving) return; // Prevent multiple submissions
+
+    setIsSaving(true); // Start loading
+
     try {
       const response = await fetch("http://localhost:5000/api/edit-module", {
         method: "PUT",
@@ -46,6 +52,8 @@ export default function ModuleSettings({
           error.message ||
           "Failed to update module settings. Please try again.",
       });
+    } finally {
+      setIsSaving(false); // Stop loading
     }
   }
 
@@ -95,10 +103,41 @@ export default function ModuleSettings({
         />
       </div>
       <button
-        className="bg-green-500 text-white px-4 py-2 rounded cursor-pointer hover:bg-green-600 transition"
+        className={`text-white px-4 py-2 rounded transition flex items-center justify-center ${
+          isSaving
+            ? "bg-gray-400 cursor-not-allowed"
+            : "bg-green-500 cursor-pointer hover:bg-green-600"
+        }`}
         onClick={handleSaveChanges}
+        disabled={isSaving}
       >
-        Save changes
+        {isSaving ? (
+          <>
+            <svg
+              className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+            Saving...
+          </>
+        ) : (
+          "Save changes"
+        )}
       </button>
     </div>
   );

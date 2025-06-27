@@ -84,11 +84,18 @@ export default function AddModuleOverlay({
 
   return (
     <div className="fixed inset-0 bg-opacity-50 backdrop-blur-sm flex justify-center items-center z-50">
-      <div className="bg-gray-100 border border-black rounded-lg p-8 w-[400px] relative">
+      <div className="bg-gray-100 border border-black rounded-lg p-8 w-[500px] relative h-[600px] overflow-auto">
+        <button
+          type="button"
+          className="absolute cursor-pointer top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold"
+          onClick={onClose}
+        >
+          ×
+        </button>
         <h2 className="text-xl font-bold mb-4 border-b pb-2">Add Module</h2>
         <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
           <div>
-            <label className="block font-semibold mb-1">Module ID</label>
+            <label className="block font-semibold mb-1">Module Code</label>
             <input
               className="w-full border-2 rounded px-2 py-1"
               name="id"
@@ -99,25 +106,37 @@ export default function AddModuleOverlay({
           </div>
           <div>
             <label className="block font-semibold mb-1">Module Name</label>
-            <input
-              className="w-full border-2 rounded px-2 py-1"
+            <textarea
+              className="w-full border-2 rounded px-2 py-1 resize-none overflow-y-auto"
               name="name"
               value={moduleParams.name}
               onChange={handleModuleParamChange}
               required
+              rows={2}
+              maxLength={100}
+              placeholder="Enter module name (max 100 characters)"
             />
+            <div className="text-xs text-gray-500 mt-1">
+              {moduleParams.name.length}/100 characters
+            </div>
           </div>
           <div>
             <label className="block font-semibold mb-1">
               Module Description
             </label>
-            <input
-              className="w-full border-2 rounded px-2 py-1"
+            <textarea
+              className="w-full border-2 rounded px-2 py-1 resize-none overflow-y-auto"
               name="description"
               value={moduleParams.description}
               onChange={handleModuleParamChange}
               required
+              rows={4}
+              maxLength={500}
+              placeholder="Enter module description (max 500 characters)"
             />
+            <div className="text-xs text-gray-500 mt-1">
+              {moduleParams.description.length}/500 characters
+            </div>
           </div>
           <div>
             <label className="block font-semibold mb-1">Module Owner</label>
@@ -132,6 +151,7 @@ export default function AddModuleOverlay({
               Initial credit amount for students
             </label>
             <input
+              placeholder="e.g. 100"
               className="w-full border-2 rounded px-2 py-1"
               value={credit}
               onChange={(e) => setCredit(e.target.value)}
