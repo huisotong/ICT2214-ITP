@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 
 export default function LLMSettings({ module, setModal, refreshTrigger }) {
   const [llmSettings, setLlmSettings] = useState({});
-
   const [availableDocuments, setAvailableDocuments] = useState([]);
+  const [isSaving, setIsSaving] = useState(false); // Add loading state
+  const [isUploading, setIsUploading] = useState(false); // Add upload loading state
+  const [untaggingDocs, setUntaggingDocs] = useState(new Set()); // Track which docs are being untagged
 
   const availableModels = [
     { label: "Gpt-4 (Paid)", value: "openai/gpt-4" },
@@ -20,14 +22,11 @@ export default function LLMSettings({ module, setModal, refreshTrigger }) {
 
   // Save regular parameters
   const handleSaveChanges = async () => {
-    try {
-      // Show loading state
-      const saveButton = document.querySelector('button[type="submit"]');
-      if (saveButton) {
-        saveButton.disabled = true;
-        saveButton.innerHTML = "Saving...";
-      }
+    if (isSaving) return; // Prevent multiple submissions
 
+    setIsSaving(true); // Start loading
+
+    try {
       // Prepare the settings object
       const settingsToSave = {
         model: llmSettings.model,
@@ -64,14 +63,10 @@ export default function LLMSettings({ module, setModal, refreshTrigger }) {
       });
     } catch (error) {
       console.error("Error saving settings:", error);
-      toast.error(error.response?.data?.message || "Failed to save settings");
+      // Note: You'll need to import toast or replace with your error handling
+      // toast.error(error.response?.data?.message || "Failed to save settings");
     } finally {
-      // Reset button state
-      const saveButton = document.querySelector('button[type="submit"]');
-      if (saveButton) {
-        saveButton.disabled = false;
-        saveButton.innerHTML = "Save changes";
-      }
+      setIsSaving(false); // Stop loading
     }
   };
 
@@ -80,13 +75,16 @@ export default function LLMSettings({ module, setModal, refreshTrigger }) {
     const file = e.target.files[0];
     if (!file) return;
 
+    if (isUploading) return; // Prevent multiple uploads
+
+    setIsUploading(true); // Start upload loading
+
     // Create FormData object to send file
     const formData = new FormData();
     formData.append("file", file);
     formData.append("moduleID", module.moduleID);
 
     try {
-      // TODO: Implement actual file upload API call
       const response = await fetch("http://localhost:5000/api/tag-document", {
         method: "POST",
         body: formData,
@@ -101,14 +99,37 @@ export default function LLMSettings({ module, setModal, refreshTrigger }) {
       };
 
       setAvailableDocuments((prev) => [...prev, newDoc]);
+
+      // Show success message
+      setModal({
+        active: true,
+        type: "success",
+        message: `Document "${data.filename}" tagged successfully!`,
+      });
+
+      // Clear the file input
+      e.target.value = "";
     } catch (error) {
       console.error("Error uploading file:", error);
-      // Add error handling as needed
+      setModal({
+        active: true,
+        type: "fail",
+        message:
+          error.message ||
+          "Failed to upload and tag document. Please try again.",
+      });
+    } finally {
+      setIsUploading(false); // Stop upload loading
     }
   };
 
   // File Upload for Untagging
   const handleDocumentDelete = async (docId) => {
+    if (untaggingDocs.has(docId)) return; // Prevent multiple untag requests for same doc
+
+    // Add doc to untagging set
+    setUntaggingDocs((prev) => new Set(prev).add(docId));
+
     try {
       const response = await fetch("http://localhost:5000/api/untag-document", {
         method: "POST",
@@ -125,8 +146,27 @@ export default function LLMSettings({ module, setModal, refreshTrigger }) {
       if (!response.ok) throw new Error(data.error || "Untagging failed");
 
       setAvailableDocuments((prev) => prev.filter((doc) => doc.id !== docId));
+
+      // Show success message
+      setModal({
+        active: true,
+        type: "success",
+        message: "Document untagged successfully!",
+      });
     } catch (error) {
       console.error("Error untagging document:", error);
+      setModal({
+        active: true,
+        type: "fail",
+        message: error.message || "Failed to untag document. Please try again.",
+      });
+    } finally {
+      // Remove doc from untagging set
+      setUntaggingDocs((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(docId);
+        return newSet;
+      });
     }
   };
 
@@ -236,11 +276,42 @@ export default function LLMSettings({ module, setModal, refreshTrigger }) {
 
       {/* Save Button */}
       <button
-        className="bg-green-500 w-full text-white px-3 py-1.5 rounded cursor-pointer hover:bg-green-600 transition text-sm"
+        className={`w-full text-white px-3 py-1.5 rounded transition text-sm flex items-center justify-center ${
+          isSaving
+            ? "bg-gray-400 cursor-not-allowed"
+            : "bg-green-500 cursor-pointer hover:bg-green-600"
+        }`}
         type="submit"
         onClick={handleSaveChanges}
+        disabled={isSaving}
       >
-        Save changes
+        {isSaving ? (
+          <>
+            <svg
+              className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+            Saving...
+          </>
+        ) : (
+          "Save changes"
+        )}
       </button>
 
       {/* Tagged Documents */}
@@ -252,9 +323,40 @@ export default function LLMSettings({ module, setModal, refreshTrigger }) {
               <span>{doc.name}</span>
               <button
                 onClick={() => handleDocumentDelete(doc.id)}
-                className="text-red-500 hover:text-red-700 text-xs"
+                disabled={untaggingDocs.has(doc.id)}
+                className={`text-xs flex items-center ${
+                  untaggingDocs.has(doc.id)
+                    ? "text-gray-400 cursor-not-allowed"
+                    : "text-red-500 hover:text-red-700 cursor-pointer"
+                }`}
               >
-                Untag
+                {untaggingDocs.has(doc.id) ? (
+                  <>
+                    <svg
+                      className="animate-spin -ml-1 mr-1 h-3 w-3"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    Untagging...
+                  </>
+                ) : (
+                  "Untag"
+                )}
               </button>
             </div>
           ))}
@@ -272,17 +374,47 @@ export default function LLMSettings({ module, setModal, refreshTrigger }) {
           <span className="cursor-pointer font-medium">Tag Documents</span>
           <input
             type="file"
-            className="block w-full text-sm text-slate-500
+            className={`block w-full text-sm text-slate-500
               file:mr-4 file:py-1.5 file:px-3
               file:rounded-full file:border-0
               file:text-sm file:font-semibold
               file:bg-violet-50 file:text-violet-700
               hover:file:bg-violet-100
-              cursor-pointer"
+              ${
+                isUploading ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+              }`}
             onChange={handleFileUpload}
             accept=".pdf,.doc,.docx,.txt"
+            disabled={isUploading}
           />
         </label>
+
+        {isUploading && (
+          <div className="flex items-center text-blue-600 text-xs">
+            <svg
+              className="animate-spin -ml-1 mr-2 h-3 w-3"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+            Uploading and tagging document...
+          </div>
+        )}
+
         <p className="text-gray-500">
           Supported formats: PDF, DOC, DOCX, TXT. Tagging is automatic.
         </p>
