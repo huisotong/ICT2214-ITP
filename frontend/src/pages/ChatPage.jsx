@@ -99,7 +99,6 @@ function ChatPage() {
     setInput("");
     setLastCost(null);
   };
-
   const handleSend = async (e) => {
     e.preventDefault();
     if (!input.trim()) return;
@@ -137,7 +136,6 @@ function ChatPage() {
       )
     );
     const messageToSend = input;
-    setInput("");
     setLoading(true);
 
     const payload = {
@@ -188,10 +186,46 @@ function ChatPage() {
           })
         );
         setSelectedChatId(updatedChatId);
+        // Clear input only on successful submission
+        setInput("");
       } else {
+        // Handle error cases - keep input text and remove placeholder message
+        if (response.status === 403 && data.error === "Insufficient credits") {
+          // Show alert for insufficient credits
+          alert(`❌ ${data.message || "You have negative credits and cannot submit new prompts."}\n\nCurrent Credits: ${data.current_credits ? data.current_credits.toFixed(5) : 'N/A'} USD\n\nPlease request additional credits from your instructor.`);
+        } else {
+          // Show generic error alert
+          alert(`❌ Error: ${data.error || "Failed to send message"}`);
+        }
+        
+        // Remove the placeholder message from the chat
+        setChats((prevChats) =>
+          prevChats.map((chat) =>
+            chat.id === selectedChatId || (!chat.id && selectedChatId === null)
+              ? {
+                  ...chat,
+                  messages: chat.messages.slice(0, -2), // Remove both user message and placeholder
+                }
+              : chat
+          )
+        );
         console.error("Error sending message:", data.error);
       }
     } catch (error) {
+      // Handle network/unexpected errors - keep input text and remove placeholder
+      alert("❌ Network error: Failed to send message. Please check your connection and try again.");
+      
+      // Remove the placeholder message from the chat
+      setChats((prevChats) =>
+        prevChats.map((chat) =>
+          chat.id === selectedChatId || (!chat.id && selectedChatId === null)
+            ? {
+                ...chat,
+                messages: chat.messages.slice(0, -2), // Remove both user message and placeholder
+              }
+            : chat
+        )
+      );
       console.error("Error while sending message:", error);
     }
     setLoading(false);
@@ -262,13 +296,15 @@ function ChatPage() {
             <span style={{ fontWeight: "bold" }}>
               {modelDetails ? `${modelDetails.model_name}` : "Loading..."}
             </span>
-          </div>
-          {/* Show assignment credits next to model */}
-          <span style={{ marginLeft: 16, fontWeight: 500, color: "#000000" }}>
-            Credits:{" "}
+          </div>          {/* Show assignment credits next to model */}
+          <span style={{ 
+            marginLeft: 16, 
+            fontWeight: 500, 
+            color: assignmentCredits !== null && assignmentCredits < 0 ? "#ea580c" : "#000000" 
+          }}>            Credits:{" "}
             {assignmentCredits !== null ? assignmentCredits.toFixed(5) : "..."}{" "}
             USD
-            {lastCost > 0 && (
+            {lastCost !== null && lastCost > 0 && (
               <span className={styles.creditsCost}>
                 (-{lastCost.toFixed(5)})
               </span>
@@ -332,28 +368,55 @@ function ChatPage() {
             <div className={styles.emptyMessage}>Start chatting now</div>
           )}
           <div ref={messagesEndRef} />
-        </div>
-
-        {/* Input box / Form: pinned to bottom */}
+        </div>        {/* Input box / Form: pinned to bottom */}
         <form
           onSubmit={handleSend}
           className={`${styles.inputForm} ${
             loading ? styles.inputFormLoading : ""
           }`}
         >
+          {assignmentCredits !== null && assignmentCredits < 0 && (
+            <div style={{
+              position: "absolute",
+              bottom: "100%",
+              left: "1rem",
+              right: "1rem",
+              backgroundColor: "#fef2f2",
+              color: "#dc2626",
+              padding: "8px 12px",
+              borderRadius: "6px 6px 0 0",
+              border: "1px solid #fecaca",
+              borderBottom: "none",
+              fontSize: "14px",
+              fontWeight: "500"
+            }}>
+              ⚠️ You have negative credits and cannot submit new prompts. Please request additional credits from your instructor.
+            </div>
+          )}
           <input
             type="text"
-            disabled={loading}
-            placeholder="Type your message..."
+            disabled={loading || (assignmentCredits !== null && assignmentCredits < 0)}
+            placeholder={
+              assignmentCredits !== null && assignmentCredits < 0 
+                ? "Cannot send - negative credits" 
+                : "Type your message..."
+            }
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             className={styles.inputBox}
+            style={{
+              opacity: assignmentCredits !== null && assignmentCredits < 0 ? 0.6 : 1
+            }}
           />
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || (assignmentCredits !== null && assignmentCredits < 0)}
             className={styles.sendButton}
+            style={{
+              opacity: assignmentCredits !== null && assignmentCredits < 0 ? 0.6 : 1,
+              cursor: assignmentCredits !== null && assignmentCredits < 0 ? "not-allowed" : "pointer"
+            }}
           >
             {loading ? "Generating..." : "Send"}
           </button>

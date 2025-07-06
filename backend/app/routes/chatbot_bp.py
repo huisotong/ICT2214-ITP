@@ -290,11 +290,18 @@ def send_message():
         # Added user_id to the check, for credit deduction
         if not module_id or not user_message or not user_id:
             return jsonify({"error": "module_id, message, and user_id are required"}), 400
-        
-        # Fetch user assignment and settings early for access to credits and model name
+          # Fetch user assignment and settings early for access to credits and model name
         assignment = ModuleAssignment.query.filter_by(userID=user_id, moduleID=str(module_id)).first()
         if not assignment:
             return jsonify({"error": "No assignment found for the given user and module"}), 404
+        
+        # Check if user has negative credits - prevent submission if so
+        if assignment.studentCredits < 0:
+            return jsonify({
+                "error": "Insufficient credits", 
+                "message": "You have negative credits and cannot submit new prompts. Please request additional credits from your instructor.",
+                "current_credits": assignment.studentCredits
+            }), 403
         
         chat_session = None
         # For the first message, create a new chat session.
