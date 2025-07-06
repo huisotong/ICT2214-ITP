@@ -108,7 +108,7 @@ export default function RequestCreditsPage({ setModal }) {
       setModal?.({ 
         active: true, 
         type: "success", 
-        message: "Credit request submitted successfully! You will be notified once it's reviewed." 
+        message: "Credit request submitted successfully!" 
       });
       
       // Reset form
@@ -141,6 +141,53 @@ export default function RequestCreditsPage({ setModal }) {
     }
   };
 
+  const handleDeleteRequest = async (requestID) => {
+    if (!window.confirm("Are you sure you want to delete this credit request? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/credit-requests/${requestID}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to delete credit request");
+      }
+
+      setModal?.({ 
+        active: true, 
+        type: "success", 
+        message: "Credit request deleted successfully!" 
+      });
+      
+      // Refresh user requests
+      const userModuleAssignments = modules.map(m => m.assignmentID);
+      try {
+        const refreshResponse = await fetch("http://localhost:5000/api/credit-requests");
+        if (refreshResponse.ok) {
+          const allRequests = await refreshResponse.json();
+          const filteredRequests = allRequests.filter(req => 
+            userModuleAssignments.includes(req.assignmentID)
+          );
+          setUserRequests(filteredRequests);
+        }
+      } catch (error) {
+        console.error("Error refreshing requests:", error);
+      }
+      
+    } catch (error) {
+      setModal?.({ 
+        active: true, 
+        type: "fail", 
+        message: error.message 
+      });
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
       {/* Existing Requests Section */}
@@ -156,6 +203,7 @@ export default function RequestCreditsPage({ setModal }) {
                   <th className="border border-gray-300 px-4 py-2 text-left">Credits Requested</th>
                   <th className="border border-gray-300 px-4 py-2 text-left">Status</th>
                   <th className="border border-gray-300 px-4 py-2 text-left">Request Date</th>
+                  <th className="border border-gray-300 px-4 py-2 text-left">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -180,6 +228,18 @@ export default function RequestCreditsPage({ setModal }) {
                       </td>
                       <td className="border border-gray-300 px-4 py-2">
                         {request.requestDate ? new Date(request.requestDate).toLocaleDateString() : 'N/A'}
+                      </td>                      <td className="border border-gray-300 px-4 py-2">
+                        {request.status === 'Pending' ? (
+                          <button
+                            onClick={() => handleDeleteRequest(request.requestID)}
+                            className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm font-semibold transition-colors"
+                            title="Delete this pending request"
+                          >
+                            Delete
+                          </button>
+                        ) : (
+                          <span className="text-gray-500 text-sm">-</span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -193,11 +253,10 @@ export default function RequestCreditsPage({ setModal }) {
       {/* Submit New Request Section */}
       <div className="bg-white rounded-lg shadow-md p-8">
         <h1 className="text-2xl font-bold text-gray-800 mb-6">Request Credits</h1>
-        
-        <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-400 rounded">
+          <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-400 rounded">
           <p className="text-blue-800">
             <strong>Note:</strong> Credit requests are reviewed by administrators. 
-            You can only have one pending request per module at a time.
+            You can only have one pending request per module at a time. You can delete pending requests if you change your mind.
           </p>
         </div>
 

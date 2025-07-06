@@ -120,3 +120,26 @@ def submit_credit_request():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+@credit_requests_bp.route('/credit-requests/<int:request_id>', methods=['DELETE'])
+def delete_credit_request(request_id):
+    """Allow students to delete their own pending credit requests"""
+    try:
+        # Get the credit request
+        credit_request = CreditRequest.query.get(request_id)
+        if not credit_request:
+            return jsonify({'error': 'Credit request not found'}), 404
+        
+        # Only allow deletion of pending requests
+        if credit_request.status != 'Pending':
+            return jsonify({'error': 'Can only delete pending requests'}), 400
+        
+        # Delete the request
+        db.session.delete(credit_request)
+        db.session.commit()
+        
+        return jsonify({'message': 'Credit request deleted successfully'}), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
