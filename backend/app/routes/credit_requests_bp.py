@@ -50,6 +50,15 @@ def update_credit_request_status(request_id):
     if not req:
         return jsonify({"error": "Request not found"}), 404
     
+    # If approving the request, add credits to the student's account
+    if new_status == "Approved" and req.status != "Approved":
+        # Find the module assignment to update student credits
+        module_assignment = ModuleAssignment.query.get(req.assignmentID)
+        if module_assignment:
+            # Add the requested credits to the student's current credits
+            current_credits = module_assignment.studentCredits or 0
+            module_assignment.studentCredits = current_credits + req.creditsRequested
+    
     req.status = new_status
     db.session.commit()
     
