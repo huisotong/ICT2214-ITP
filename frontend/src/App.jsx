@@ -13,6 +13,7 @@ import LoginPage from "./pages/LoginPage";
 import HomePage from "./pages/HomePage";
 import ManageModules from "./pages/ManageModules";
 import ManageCreditRequests from "./pages/ManageCreditRequests"; // Import the new page
+import RequestCreditsPage from "./pages/RequestCreditsPage";
 import ChatPage from "./pages/ChatPage";
 import ProfilePage from "./pages/ProfilePage";
 import ProtectedLayout from "./components/global/ProtectedLayout";
@@ -72,6 +73,10 @@ function App() {
             <Route
               path="/manage-credit-requests"
               element={<ManageCreditRequests setModal={setModal} />}
+            />
+            <Route
+              path="/request-credits"
+              element={<RequestCreditsPage setModal={setModal} />}
             />
           </Route>
         </Routes>

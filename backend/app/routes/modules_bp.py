@@ -26,10 +26,8 @@ def get_assigned_modules():
     try:
         user_id = request.args.get('userId')
         if not user_id:
-            return jsonify({"error": "User ID is required"}), 400
-
-        # Query to get all module assignments for the user with student credits
-        results = db.session.query(Module, ModuleAssignment.studentCredits)\
+            return jsonify({"error": "User ID is required"}), 400        # Query to get all module assignments for the user with student credits and assignment ID
+        results = db.session.query(Module, ModuleAssignment.studentCredits, ModuleAssignment.assignmentID)\
             .join(ModuleAssignment, Module.moduleID == ModuleAssignment.moduleID)\
             .filter(ModuleAssignment.userID == user_id)\
             .all()
@@ -39,8 +37,9 @@ def get_assigned_modules():
             "moduleID": module.moduleID,
             "moduleName": module.moduleName,
             "moduleDesc": module.moduleDesc,
-            "studentCredits": student_credits
-        } for module, student_credits in results]
+            "studentCredits": student_credits,
+            "assignmentID": assignment_id
+        } for module, student_credits, assignment_id in results]
 
         return jsonify(modules_list), 200
 

@@ -4,6 +4,7 @@ from app.models.module_assignment import ModuleAssignment
 from app.models.users import User
 from app.db import db
 import sys
+from datetime import datetime
 
 credit_requests_bp = Blueprint('credit_requests', __name__)
 
@@ -67,3 +68,55 @@ def update_credit_request_status(request_id):
             updated_req_data['studentName'] = None
         
     return jsonify(updated_req_data), 200
+
+@credit_requests_bp.route('/credit-requests', methods=['POST'])
+def submit_credit_request():
+    """Allow students to submit credit requests"""
+    data = request.get_json()
+    assignment_id = data.get('assignmentID')
+    credits_requested = data.get('creditsRequested')
+    
+    if not assignment_id or not credits_requested:
+        return jsonify({'error': 'Assignment ID and credits requested are required'}), 400
+    
+    try:
+        credits_requested = int(credits_requested)
+        if credits_requested <= 0:
+            return jsonify({'error': 'Credits requested must be a positive number'}), 400
+    except ValueError:
+        return jsonify({'error': 'Invalid credits requested format'}), 400
+    
+    try:
+        # Verify assignment exists
+        assignment = ModuleAssignment.query.get(assignment_id)
+        if not assignment:
+            return jsonify({'error': 'Module not found'}), 404
+        
+        # Check if there's already a pending request for this Module
+        existing_request = CreditRequest.query.filter_by(
+            assignmentID=assignment_id,
+            status='Pending'
+        ).first()
+        
+        if existing_request:
+            return jsonify({'error': 'A pending request already exists for this Module'}), 400
+        
+        # Create new credit request
+        new_request = CreditRequest(
+            assignmentID=assignment_id,
+            creditsRequested=credits_requested,
+            status='Pending',
+            requestDate=datetime.utcnow()
+        )
+        
+        db.session.add(new_request)
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Credit request submitted successfully',
+            'requestID': new_request.requestID
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 function ProfilePage({ user, setModal }) {
+  const navigate = useNavigate();
   const [userDetails, setUserDetails] = useState({});
   const [isEditing, setIsEditing] = useState(false);
 
@@ -64,8 +66,10 @@ function ProfilePage({ user, setModal }) {
             }}
           >
             {isEditing ? "Save Changes" : "Edit"}
-          </button>
-          <button className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+          </button>          <button 
+            className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+            onClick={() => navigate("/request-credits")}
+          >
             Request credits
           </button>
         </div>
