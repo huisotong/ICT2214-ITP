@@ -37,6 +37,7 @@ def get_assigned_modules():
             "moduleID": module.moduleID,
             "moduleName": module.moduleName,
             "moduleDesc": module.moduleDesc,
+            "initialCredit": module.initialCredit,
             "studentCredits": student_credits,
             "assignmentID": assignment_id
         } for module, student_credits, assignment_id in results]
@@ -185,9 +186,16 @@ def edit_module():
         new_module_id = data.get('moduleID')
         module_name = data.get('moduleName')
         module_desc = data.get('moduleDesc')
+        initial_credit = data.get('initialCredit')
 
         if not all([old_module_id, new_module_id, module_name]):
             return jsonify({"error": "Missing required fields"}), 400
+        
+        if initial_credit is not None:
+            try:
+                initial_credit = int(initial_credit)
+            except (ValueError, TypeError):
+                return jsonify({"error": "initialCredit must be an integer"}), 400
 
         # Find the module to update
         module = Module.query.get(old_module_id)
@@ -204,7 +212,8 @@ def edit_module():
             new_module = Module(
                 moduleID=new_module_id,
                 moduleName=module_name,
-                moduleDesc=module_desc
+                moduleDesc=module_desc,
+                initialCredit=initial_credit
             )
             db.session.add(new_module)
             db.session.flush()  # Flush to ensure new module is in DB
@@ -225,6 +234,8 @@ def edit_module():
             # Just update the existing module's details
             module.moduleName = module_name
             module.moduleDesc = module_desc
+            if initial_credit is not None:
+                module.initialCredit = initial_credit
 
         db.session.commit()
 

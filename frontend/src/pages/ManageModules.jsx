@@ -13,6 +13,7 @@ export default function ManageModules({ setModal }) {
     moduleID: "",
     moduleName: "",
     moduleDesc: "",
+    initialCredit: 0,
   });
 
   const { auth } = useAuth();
@@ -47,6 +48,7 @@ export default function ManageModules({ setModal }) {
         moduleID: selected.moduleID,
         moduleName: selected.moduleName,
         moduleDesc: selected.moduleDesc,
+        initialCredit: selected.initialCredit,
       });
       setRefreshStudents((prev) => prev + 1);
       setRefreshLLM((prev) => prev + 1);
@@ -68,7 +70,7 @@ export default function ManageModules({ setModal }) {
 
       setModal({ active: true, type: "success", message: `Module ${moduleId} deleted successfully!` });
       setSelectedModule(null);
-      setModuleSettings({ moduleID: "", moduleName: "", moduleDesc: "" });
+      setModuleSettings({ moduleID: "", moduleName: "", moduleDesc: "", initialCredit: 0 });
       setRefreshStudents((prev) => prev + 1);
       await fetchUserAssignedModules();
     } catch (error) {

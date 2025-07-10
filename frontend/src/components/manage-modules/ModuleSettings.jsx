@@ -25,6 +25,7 @@ export default function ModuleSettings({
           moduleID: moduleSettings.moduleID,
           moduleName: moduleSettings.moduleName,
           moduleDesc: moduleSettings.moduleDesc,
+          initialCredit: moduleSettings.initialCredit,
         }),
       });
 
@@ -98,6 +99,20 @@ export default function ModuleSettings({
             setModuleSettings({
               ...moduleSettings,
               moduleDesc: e.target.value,
+            })
+          }
+        />
+      </div>
+      <div className="mb-4">
+        <label className="block mb-2">Initial Credit:</label>
+        <input
+          type="number"
+          className="w-full p-2 border rounded"
+          value={moduleSettings.initialCredit}
+          onChange={(e) =>
+            setModuleSettings({
+              ...moduleSettings,
+              initialCredit: e.target.value,
             })
           }
         />
