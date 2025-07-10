@@ -199,7 +199,7 @@ def edit_module():
             existing_module = Module.query.filter_by(moduleID=new_module_id).first()
             if existing_module:
                 return jsonify({"error": f"Module ID {new_module_id} already exists"}), 400
-            
+
             # Create new module with new ID
             new_module = Module(
                 moduleID=new_module_id,
@@ -211,6 +211,11 @@ def edit_module():
 
             # Update module assignments to point to new module
             ModuleAssignment.query.filter_by(moduleID=old_module_id).update({
+                "moduleID": new_module_id
+            })
+
+            # Update ChatbotSettings to point to new module
+            ChatbotSettings.query.filter_by(moduleID=old_module_id).update({
                 "moduleID": new_module_id
             })
 
