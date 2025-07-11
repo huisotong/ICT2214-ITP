@@ -12,7 +12,10 @@ from qdrant_client.models import Distance, VectorParams, PointStruct, PointIdsLi
 import os
 import uuid
 from dotenv import load_dotenv
-from docx import Document as DocxDocument
+from docx import Document as DOCXDocument
+import pdfplumber
+import openpyxl
+from pptx import Presentation as PPTXDocument
 from io import BytesIO
 import traceback
 from datetime import datetime
@@ -48,6 +51,72 @@ TODO: redo cost estimation function.
 (call https://openrouter.ai/api/v1/models, get model pricing, estimate toks, calculate cost)
 """
 
+# Function to extract text
+def extract_text_from_file(file):
+    ext = file.filename.lower().split('.')[-1]
+    content = ""
+
+    # DOCX (Word)
+    if ext == "docx":
+        docx_io = BytesIO(file.read())
+        doc = DOCXDocument(docx_io)
+
+        paragraphs = [para.text.strip() for para in doc.paragraphs if para.text.strip()]
+        content += "\n".join(paragraphs)
+
+        # Extract tables
+        for table in doc.tables:
+            for row in table.rows:
+                row_text = [cell.text.strip() for cell in row.cells]
+                content += "\n" + "\t".join(row_text)
+
+    # PDF
+    elif ext == "pdf":
+        pdf_io = BytesIO(file.read())
+        with pdfplumber.open(pdf_io) as pdf:
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    content += page_text + "\n"
+
+                # Extract tables
+                tables = page.extract_tables()
+                for table in tables:
+                    for row in table:
+                        row_text = [cell.strip() if cell else "" for cell in row]
+                        content += "\n" + "\t".join(row_text)
+
+    # PPTX (PowerPoint)
+    elif ext == "pptx":
+        pptx_io = BytesIO(file.read())
+        prs = PPTXDocument(pptx_io)
+
+        for slide in prs.slides:
+            for shape in slide.shapes:
+                if hasattr(shape, "text") and shape.text.strip():
+                    content += shape.text.strip() + "\n"
+
+                if shape.has_table:
+                    for row in shape.table.rows:
+                        row_text = [cell.text.strip() for cell in row.cells]
+                        content += "\n" + "\t".join(row_text)
+
+    # XLSX (Excel)
+    elif ext in ["xlsx", "xls"]:
+        excel_io = BytesIO(file.read())
+        wb = openpyxl.load_workbook(excel_io, data_only=True)
+
+        for sheet in wb.worksheets:
+            for row in sheet.iter_rows(values_only=True):
+                row_text = [str(cell).strip() if cell is not None else "" for cell in row]
+                if any(row_text):
+                    content += "\n" + "\t".join(row_text)
+
+    # Unsupported
+    else:
+        raise ValueError("Unsupported file format")
+
+    return content.strip()
 
 # Function to tag document from qdrant
 def tag_document_to_qdrant(module_id: str, file_content: str, filename: str):
@@ -227,13 +296,8 @@ def tag_document():
         if not module_id or not file:
             return jsonify({"error": "Missing moduleID or file"}), 400
 
-        # Step 1: Read uploaded DOCX or plain text content
-        if file.filename.lower().endswith(".docx"):
-            docx_io = BytesIO(file.read())
-            doc = DocxDocument(docx_io)
-            content = "\n".join([para.text for para in doc.paragraphs])
-        else:
-            content = file.read().decode("utf-8")
+        # 🔍 Extract text from any supported file
+        content = extract_text_from_file(file)
 
         if not content.strip():
             return jsonify({"error": "No content extracted from file"}), 400
