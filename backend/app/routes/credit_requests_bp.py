@@ -15,24 +15,28 @@ def get_credit_requests():
     requests_data = db.session.query(
         CreditRequest,
         User.studentID,
-        User.name
+        User.name,
+        Module.moduleID,
+        Module.moduleName
     ).outerjoin(ModuleAssignment, CreditRequest.assignmentID == ModuleAssignment.assignmentID)\
     .outerjoin(User, ModuleAssignment.userID == User.userID)\
+    .outerjoin(Module, ModuleAssignment.moduleID == Module.moduleID)\
     .all()
     print(f"Raw requests_data count: {len(requests_data)}", file=sys.stderr)
 
     results = []
-    for index, (req_object, student_id_val, student_name_val) in enumerate(requests_data):
+    for index, (req_object, student_id_val, student_name_val, module_id_val, module_name_val) in enumerate(requests_data):
         print(f"Processing item {index}:", file=sys.stderr)
-        print(f"  Raw query - requestID: {req_object.requestID}, student_id_val: {student_id_val}, student_name_val: {student_name_val}", file=sys.stderr)
+        print(f"  Raw query - requestID: {req_object.requestID}, student_id_val: {student_id_val}, student_name_val: {student_name_val}, module_id_val: {module_id_val}, module_name_val: {module_name_val}", file=sys.stderr)
         r_dict_from_model = req_object.to_dict()
         print(f"From req_object.to_dict(): {r_dict_from_model}", file=sys.stderr)
         
-        # Explicitly set/overwrite studentID and studentName from the query results
-        # This is the intended final state for these fields in the dictionary
+        # Explicitly set/overwrite fields from the query results
         final_r_dict = r_dict_from_model.copy() # Start with what to_dict() provided
         final_r_dict['studentID'] = student_id_val
         final_r_dict['studentName'] = student_name_val
+        final_r_dict['moduleID'] = module_id_val
+        final_r_dict['moduleName'] = module_name_val
         
         print(f"  Final r_dict for response: {final_r_dict}", file=sys.stderr)
         results.append(final_r_dict)
@@ -50,8 +54,7 @@ def update_credit_request_status(request_id):
     req = CreditRequest.query.get(request_id)
     if not req:
         return jsonify({"error": "Request not found"}), 404
-    
-    # If approving the request, add credits to the student's account
+      # If approving the request, add credits to the student's account
     if new_status == "Approved" and req.status != "Approved":
         # Find the module assignment to update student credits
         module_assignment = ModuleAssignment.query.get(req.assignmentID)
@@ -64,17 +67,22 @@ def update_credit_request_status(request_id):
     db.session.commit()
     
     updated_req_data = req.to_dict()
-    # Attempt to add/update studentID and studentName by re-querying based on assignmentID
-    # This ensures the latest user data is fetched if relationships weren't loaded or are stale.
+    # Attempt to add/update studentID, studentName, moduleID, and moduleName by re-querying based on assignmentID
     if req.assignmentID:
-        user_info_tuple = db.session.query(User.studentID, User.name)\
+        user_module_info = db.session.query(User.studentID, User.name, Module.moduleID, Module.moduleName)\
             .join(ModuleAssignment, ModuleAssignment.userID == User.userID)\
+            .join(Module, ModuleAssignment.moduleID == Module.moduleID)\
             .filter(ModuleAssignment.assignmentID == req.assignmentID).first()
-        if user_info_tuple:
-            updated_req_data['studentID'] = user_info_tuple[0]  # Access by index
-            updated_req_data['studentName'] = user_info_tuple[1] # Access by index        else:
+        if user_module_info:
+            updated_req_data['studentID'] = user_module_info[0]
+            updated_req_data['studentName'] = user_module_info[1]
+            updated_req_data['moduleID'] = user_module_info[2]
+            updated_req_data['moduleName'] = user_module_info[3]
+        else:
             updated_req_data['studentID'] = None
             updated_req_data['studentName'] = None
+            updated_req_data['moduleID'] = None
+            updated_req_data['moduleName'] = None
         
     return jsonify(updated_req_data), 200
 
