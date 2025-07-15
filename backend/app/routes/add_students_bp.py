@@ -62,7 +62,6 @@ def enroll_single_student():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-# 🔹 Enroll multiple students from CSV
 @add_students_bp.route('/enroll-students-csv', methods=['POST'])
 def enroll_students_csv():
     if 'file' not in request.files:
@@ -81,7 +80,9 @@ def enroll_students_csv():
 
         reader = csv.reader(TextIOWrapper(file, encoding='utf-8'))
         header_skipped = False
-        count = 0
+        added_count = 0
+        total_students = 0
+        not_found_ids = []
         skipped = []
 
         for row in reader:
@@ -92,6 +93,7 @@ def enroll_students_csv():
             if len(row) < 2:
                 continue
 
+            total_students += 1
             name, student_id = row[0].strip(), row[1].strip()
             if not student_id.isdigit():
                 skipped.append(f"Invalid ID format: {student_id}")
@@ -99,7 +101,7 @@ def enroll_students_csv():
 
             student = Student.query.filter_by(studentID=student_id).first()
             if not student:
-                skipped.append(f"Student ID not found: {student_id}")
+                not_found_ids.append(student_id)
                 continue
 
             user = User.query.filter_by(studentID=student_id).first()
@@ -124,11 +126,17 @@ def enroll_students_csv():
                 moduleID=module_id,
                 studentCredits=module.initialCredit
             ))
-            count += 1
+            added_count += 1
 
         db.session.commit()
+
+        # Construct message in desired format
+        message = f"{added_count}/{total_students} students added successfully."
+        if not_found_ids:
+            message += f" {len(not_found_ids)} student{'s' if len(not_found_ids) > 1 else ''} not found. ({', '.join(not_found_ids)})"
+
         return jsonify({
-            'message': f'{count} students enrolled successfully.',
+            'message': message,
             'skipped': skipped
         }), 200
 
