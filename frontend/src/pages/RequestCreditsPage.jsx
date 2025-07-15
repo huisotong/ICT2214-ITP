@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useNotifications } from "../context/NotificationContext";
 import { fetchAssignedModules } from "../../utils/fetchAssignedModules";
 
 export default function RequestCreditsPage({ setModal }) {
   const { auth } = useAuth();
+  const { checkForNewNotifications } = useNotifications();
   const user = auth.user;
 
   const [modules, setModules] = useState([]);
@@ -64,6 +66,13 @@ export default function RequestCreditsPage({ setModal }) {
       fetchUserRequests();
     }
   }, [modules]);
+
+  // Check for new notifications when page loads
+  useEffect(() => {
+    if (user?.userID) {
+      checkForNewNotifications();
+    }
+  }, [user?.userID, checkForNewNotifications]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

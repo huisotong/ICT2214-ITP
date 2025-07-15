@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
+import { NotificationProvider } from "./context/NotificationContext";
 
 // Import styles and components
 import styles from "./styles/global.module.css";
 import "./styles/App.css";
 import Modal from "./components/global/Modal";
+import NotificationPopup from "./components/global/NotificationPopup";
 import PrivateRoute from "./components/global/PrivateRoute";
 
 // Import pages
@@ -38,11 +40,13 @@ function App() {
       return () => clearTimeout(timeout);
     }
   }, [modal]);
-
   return (
-    <>
+    <NotificationProvider>
       {/* Show global modal if active */}
       {modal.active && <Modal modal={modal} />}
+      
+      {/* Show notification popup */}
+      <NotificationPopup />
 
       {/* Main App Content */}
       <main className={styles.main}>
@@ -78,10 +82,9 @@ function App() {
               path="/request-credits"
               element={<RequestCreditsPage setModal={setModal} />}
             />
-          </Route>
-        </Routes>
+          </Route>        </Routes>
       </main>
-    </>
+    </NotificationProvider>
   );
 }
 

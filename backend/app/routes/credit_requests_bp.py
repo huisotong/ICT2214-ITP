@@ -2,9 +2,10 @@ from flask import Blueprint, jsonify, request, current_app
 from app.models.credit_requests import CreditRequest
 from app.models.module_assignment import ModuleAssignment
 from app.models.users import User
+from app.models.module import Module
 from app.db import db
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta, timedelta
 
 credit_requests_bp = Blueprint('credit_requests', __name__)
 
@@ -71,12 +72,42 @@ def update_credit_request_status(request_id):
             .filter(ModuleAssignment.assignmentID == req.assignmentID).first()
         if user_info_tuple:
             updated_req_data['studentID'] = user_info_tuple[0]  # Access by index
-            updated_req_data['studentName'] = user_info_tuple[1] # Access by index
-        else:
+            updated_req_data['studentName'] = user_info_tuple[1] # Access by index        else:
             updated_req_data['studentID'] = None
             updated_req_data['studentName'] = None
         
     return jsonify(updated_req_data), 200
+
+@credit_requests_bp.route('/credit-requests/user/<int:user_id>/approved', methods=['GET'])
+def get_user_approved_requests(user_id):
+    """Get approved credit requests for a specific user for notifications"""
+    try:
+        approved_requests = db.session.query(
+            CreditRequest,
+            Module.moduleID,
+            Module.moduleName
+        ).join(ModuleAssignment, CreditRequest.assignmentID == ModuleAssignment.assignmentID)\
+        .join(User, ModuleAssignment.userID == User.userID)\
+        .join(Module, ModuleAssignment.moduleID == Module.moduleID)\
+        .filter(
+            User.userID == user_id,
+            CreditRequest.status == 'Approved'
+        ).all()
+        
+        result = []
+        for credit_req, module_id, module_name in approved_requests:
+            result.append({
+                'requestID': credit_req.requestID,
+                'creditsRequested': credit_req.creditsRequested,
+                'moduleID': module_id,
+                'moduleName': module_name,
+                'message': f'Your request for {credit_req.creditsRequested} USD credits for {module_name} has been approved!'
+            })
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @credit_requests_bp.route('/credit-requests', methods=['POST'])
 def submit_credit_request():
@@ -151,4 +182,42 @@ def delete_credit_request(request_id):
         
     except Exception as e:
         db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@credit_requests_bp.route('/credit-requests/notifications/<int:user_id>', methods=['GET'])
+def get_user_notifications(user_id):
+    """Get recently approved credit requests for notifications"""
+    try:
+        # Get requests approved in the last 24 hours for this user
+        twenty_four_hours_ago = datetime.utcnow() - timedelta(hours=24)
+        
+        notifications = db.session.query(
+            CreditRequest,
+            User.studentID,
+            User.name,
+            Module.moduleID,
+            Module.moduleName
+        ).join(ModuleAssignment, CreditRequest.assignmentID == ModuleAssignment.assignmentID)\
+        .join(User, ModuleAssignment.userID == User.userID)\
+        .join(Module, ModuleAssignment.moduleID == Module.moduleID)\
+        .filter(
+            User.userID == user_id,
+            CreditRequest.status == 'Approved',
+            # Check if status was recently updated (since we don't have a separate approval timestamp)
+            # We'll use a different approach - check session storage or add a 'seen' field
+        ).all()
+        
+        result = []
+        for credit_req, student_id, student_name, module_id, module_name in notifications:
+            result.append({
+                'requestID': credit_req.requestID,
+                'creditsRequested': credit_req.creditsRequested,
+                'moduleID': module_id,
+                'moduleName': module_name,
+                'approvalMessage': f'Your request for {credit_req.creditsRequested} USD credits for {module_name} has been approved!'
+            })
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
