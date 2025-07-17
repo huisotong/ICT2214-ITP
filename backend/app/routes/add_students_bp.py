@@ -90,11 +90,8 @@ def enroll_students_csv():
                 header_skipped = True
                 continue
 
-            if len(row) < 2:
-                continue
-
             total_students += 1
-            name, student_id = row[0].strip(), row[1].strip()
+            student_id = row[1].strip() if len(row) > 1 else row[0].strip()
             if not student_id.isdigit():
                 skipped.append(f"Invalid ID format: {student_id}")
                 continue

@@ -105,7 +105,7 @@ def add_module():
                 
                 # Process each row in the CSV
                 for row in csv_reader:
-                    student_id = row['student_id']
+                    student_id = row['studentID']
                     
                     # Find user by student_id
                     user = User.query.filter_by(studentID=student_id).first()
