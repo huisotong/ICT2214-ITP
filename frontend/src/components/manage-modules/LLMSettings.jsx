@@ -10,8 +10,11 @@ export default function LLMSettings({ module, setModal, refreshTrigger }) {
   const availableModels = [
     { label: "Gpt-4 (Paid)", value: "openai/gpt-4" },
     { label: "Deepseek-V3 (Paid)", value: "deepseek/deepseek-chat-v3-0324" },
-    { label: "Gemini-2.0 (Paid)", value: "google/gemini-2.0-flash-001" },
-    { label: "Claude-3 (Paid)", value: "anthropic/claude-3-sonnet" },
+    {
+      label: "Gemini 2.5 Flash (Paid)",
+      value: "google/gemini-2.5-flash",
+    },
+    { label: "Claude-4-Sonnet (Paid)", value: "anthropic/claude-sonnet-4" },
     { label: "Deepseek-R1 (Free)", value: "deepseek/deepseek-r1-0528:free" },
     { label: "Gemma-3n (Free)", value: "google/gemma-3n-e4b-it:free" },
     {

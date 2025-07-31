@@ -90,7 +90,7 @@ def add_module():
         # Create default LLM configuration for the module
         default_chatbot_settings = ChatbotSettings(
             moduleID=module_id,
-            model='gpt-4',
+            model='openai/gpt-4',
             temperature=1.0,
             system_prompt='You are a helpful AI assistant',
             max_tokens=2048
