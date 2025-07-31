@@ -6,6 +6,9 @@ from qdrant_client import QdrantClient
 from app.models.module_assignment import ModuleAssignment
 from app.models.module import Module
 from app.models.users import User
+from app.models.chat_history import ChatHistory
+from app.models.chat_message import ChatMessage
+from app.models.credit_requests import CreditRequest
 from app.db import db
 from app.models.chatbot_settings import ChatbotSettings
 
@@ -149,12 +152,34 @@ def delete_module():
         if not module:
             return jsonify({"error": f"Module {module_id} not found"}), 404
 
-        # Delete all module assignments first (to handle foreign key constraints)
+        # Get all module assignments for this module to find related records
+        module_assignments = ModuleAssignment.query.filter_by(moduleID=module_id).all()
+        assignment_ids = [assignment.assignmentID for assignment in module_assignments]
+
+        # Delete in the correct order to avoid foreign key constraint violations:
+        
+        if assignment_ids:
+            # First, get all chat history IDs for these assignments
+            chat_histories = ChatHistory.query.filter(ChatHistory.assignmentID.in_(assignment_ids)).all()
+            chat_history_ids = [chat.historyID for chat in chat_histories]
+            
+            # 1. Delete ChatMessage records that reference ChatHistory.historyID
+            if chat_history_ids:
+                ChatMessage.query.filter(ChatMessage.chatID.in_(chat_history_ids)).delete()
+            
+            # 2. Delete ChatHistory records that reference ModuleAssignment.assignmentID
+            ChatHistory.query.filter(ChatHistory.assignmentID.in_(assignment_ids)).delete()
+            
+            # 3. Delete CreditRequest records that reference ModuleAssignment.assignmentID
+            CreditRequest.query.filter(CreditRequest.assignmentID.in_(assignment_ids)).delete()
+        
+        # 4. Delete ModuleAssignment records
         ModuleAssignment.query.filter_by(moduleID=module_id).delete()
 
+        # 5. Delete ChatbotSettings records that reference moduleID
         ChatbotSettings.query.filter_by(moduleID=module_id).delete()
 
-        # Delete Qdrant collection for this module
+        # 5. Delete Qdrant collection for this module
         try:
             client = get_qdrant_client()
             collection_name = f"module_{module_id}"
@@ -163,14 +188,14 @@ def delete_module():
         except Exception as e:
             print(f"Error deleting Qdrant collection: {str(e)}")
 
-        # Delete the module
+        # 6. Finally, delete the module itself
         db.session.delete(module)
         
-        # Commit the changes
+        # Commit all the changes
         db.session.commit()
 
         return jsonify({
-            "message": f"Module {module_id} and all its assignments deleted successfully"
+            "message": f"Module {module_id} and all related data deleted successfully"
         }), 200
 
     except Exception as e:
