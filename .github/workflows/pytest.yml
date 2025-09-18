@@ -4,8 +4,8 @@ on:
   push:
     branches:
       - main
-      - develop
-      - feature/**
+      - dev
+      - Owen
   pull_request:
 
 jobs:
@@ -27,6 +27,20 @@ jobs:
           pip install -r backend/requirements.txt
           pip install pytest
 
-      - name: Run pytest
+            - name: Run pytest
         working-directory: backend
-        run: pytest --maxfail=3 --disable-warnings -q
+        env:
+          PYTHONPATH: ${{ github.workspace }}/backend
+          FLASK_ENV: testing
+          SQLALCHEMY_DATABASE_URI: sqlite:///test_ci.db   # lightweight file DB in repo dir
+        run: |
+          # ensure the schema exists before tests
+          python - <<'PY'
+          from app import create_app
+          from app.db import db
+          app = create_app()
+          with app.app_context():
+              db.create_all()
+          print("✅ Test DB ready")
+          PY
+                    pytest --maxfail=3 --disable-warnings -q
