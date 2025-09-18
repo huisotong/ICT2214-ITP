@@ -30,13 +30,10 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-cov
 
-      # Run pytest
+      # Run Pytest
       - name: Run pytest
         working-directory: backend
         env:
           PYTHONPATH: ${{ github.workspace }}/backend
           FLASK_ENV: testing
-          # SQLite fallback is already handled in create_app,
-          # but you can force in-memory DB explicitly if you like:
-          SQLALCHEMY_DATABASE_URI: "sqlite:///:memory:"
-        run: pytest --maxfail=3 --disable-warnings -q --cov=app --cov-report=term-missing
+        run: pytest --maxfail=3 --disable-warnings -q
