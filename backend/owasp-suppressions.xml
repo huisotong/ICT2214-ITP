@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+  <!-- TEMP: suppress all LangChain matches; revisit before expiry -->
   <suppress>
-    <packageUrl regex="true">^pkg:pypi/(langchain|langchain-.*)@.*</packageUrl>
+    <notes>Suppress noisy CPE matches for LangChain family until we upgrade</notes>
+    <cpe regex="true">^cpe:2\.3:a:langchain:langchain:.*</cpe>
+    <until>2026-01-31</until>
   </suppress>
 </suppressions>
