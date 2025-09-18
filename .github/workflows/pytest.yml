@@ -1,46 +1,42 @@
-name: Test Cases
+name: Backend Tests
 
 on:
   push:
-    branches:
-      - main
-      - dev
-      - Owen
+    branches: [ main, dev, Owen ]
   pull_request:
 
 jobs:
-  test:
+  pytest:
     runs-on: ubuntu-latest
 
     steps:
+      # Checkout code
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
+      # Setup Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'   # adjust if your project uses a different version
+          python-version: '3.10'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
 
-      - name: Install dependencies
+      # Install dependencies
+      - name: Install Python dependencies
+        working-directory: backend
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
-          pip install pytest
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
 
+      # Run pytest
       - name: Run pytest
         working-directory: backend
         env:
           PYTHONPATH: ${{ github.workspace }}/backend
           FLASK_ENV: testing
-          SQLALCHEMY_DATABASE_URI: sqlite:///test_ci.db   # lightweight file DB in repo dir
-        run: |
-          # ensure the schema exists before tests
-          python - <<'PY'
-          from app import create_app
-          from app.db import db
-          app = create_app()
-          with app.app_context():
-              db.create_all()
-          print("✅ Test DB ready")
-          PY
-                    pytest --maxfail=3 --disable-warnings -q
+          # SQLite fallback is already handled in create_app,
+          # but you can force in-memory DB explicitly if you like:
+          SQLALCHEMY_DATABASE_URI: sqlite:///:memory:
+        run: pytest --maxfail=3 --disable-warnings -q --cov=app --cov-report=term-missing

@@ -18,8 +18,17 @@ def create_app():
     # CORS for frontend
     CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": "http://localhost:5173"}})
 
-    # Connect to db
-    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv('SQLALCHEMY_DATABASE_URI')
+    # --- Database config ---
+    # Use env if provided; otherwise fall back to a local SQLite file for dev/test.
+    app.config.setdefault("SQLALCHEMY_DATABASE_URI",
+                          os.getenv("SQLALCHEMY_DATABASE_URI", "sqlite:///dev.db"))
+    app.config.setdefault("SQLALCHEMY_TRACK_MODIFICATIONS", False)
+
+    # If SQLite, disable schemas by translating 'dbo' -> None (SQLite has no schemas)
+    if app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite:"):
+        engine_opts = app.config.setdefault("SQLALCHEMY_ENGINE_OPTIONS", {})
+        exec_opts = engine_opts.setdefault("execution_options", {})
+        exec_opts["schema_translate_map"] = {"dbo": None}
     db.init_app(app)
 
     # JWT secret
