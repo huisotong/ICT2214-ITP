@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - dev
+      - Owen
   pull_request:
 
 jobs:
