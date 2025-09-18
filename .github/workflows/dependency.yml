@@ -71,8 +71,8 @@ jobs:
       # ------------------------
       # 4️⃣ OWASP Dependency Check (Optional, heavy)
       # ------------------------
-      - name: OWASP Dependency-Check
-        uses: dependency-check/Dependency-Check_Action@v4
+      - name: OWASP Dependency-Check~
+        uses: dependency-check/Dependency-Check_Action@main
         with:
           project: 'Unified AI Sandbox'
           path: '.'
@@ -80,7 +80,7 @@ jobs:
           out: 'reports'
           args: >
             --failOnCVSS 7
-            --suppression ${{ github.workspace }}/backend/owasp-suppressions.xml
+            --suppression backend/owasp-suppressions.xml
 
       - name: Upload OWASP report
         if: always()
