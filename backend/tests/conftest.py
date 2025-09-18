@@ -10,7 +10,7 @@ def import_all_models():
     # Import every model so SQLAlchemy sees them before create_all()
     # Adjust these imports to match your actual module names/paths
     from app.models.module import Module
-    from app.models.users import Users
+    from app.models.users import User
     from app.models.module_assignment import ModuleAssignment
     from app.models.chatbot_settings import ChatbotSettings
     from app.models.chat_history import ChatHistory
