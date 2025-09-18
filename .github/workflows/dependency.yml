@@ -17,19 +17,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout code (full history)
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0      # important: include history
+          fetch-tags: true
 
-      # ------------------------
-      # 1️⃣ Gitleaks Secret Scan
-      # ------------------------
-      - name: Scan for secrets using Gitleaks
+      - name: Scan for secrets with Gitleaks (git history)
         uses: gitleaks/gitleaks-action@v2
         with:
+          # keep the default args or set your own; no --no-git here
           args: >
-            detect --source=. --no-git
-            --redact --verbose
-            --report-format sarif --report-path gitleaks.sarif
+            detect --redact --report-format sarif --report-path gitleaks.sarif
             --exit-code=1
 
       # ------------------------
