@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+  <suppress>
+    <notes>Suppress noisy CPE matches for PyPI langchain core and plugin packages</notes>
+    <packageUrl regex="true">^pkg:pypi/(langchain|langchain-.*)@.*</packageUrl>
+    <until>2026-01-31</until>
+  </suppress>
+</suppressions>

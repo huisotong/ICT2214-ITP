@@ -1,4 +1,5 @@
 from app.db import db
+from sqlalchemy.orm import synonym
 
 class User(db.Model):
     __tablename__ = 'Users'
@@ -11,3 +12,6 @@ class User(db.Model):
     mobileNumber = db.Column(db.String(20), nullable=True)
     role = db.Column(db.String(10), nullable=False)
     studentID = db.Column(db.Integer, nullable=True)
+
+
+    username = synonym("name")

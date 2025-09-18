@@ -32,4 +32,8 @@ def test_client():
         import_all_models()
         db.create_all()
         yield app.test_client()
-        db.drop_all()
+
+        # Only drop if we’re on SQLite (avoids MSSQL FK drop errors)
+        from sqlalchemy.engine.url import make_url
+        if make_url(db.engine.url).get_backend_name() == "sqlite":
+            db.drop_all()

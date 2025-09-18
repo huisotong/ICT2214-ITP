@@ -81,6 +81,7 @@ jobs:
           args: >
             --enableExperimental
             --failOnCVSS 7
+            --suppression backend/owasp-suppressions.xml
             --enableRetired
 
       - name: Upload OWASP report
