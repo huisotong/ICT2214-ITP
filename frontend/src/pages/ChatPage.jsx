@@ -94,11 +94,14 @@ function ChatPage() {
     }
   }, [loading]);
 
+  // Handle New Chat function
   const handleNewChat = () => {
     setSelectedChatId(null);
     setInput("");
     setLastCost(null);
   };
+
+  // Handle Send function
   const handleSend = async (e) => {
     e.preventDefault();
     if (!input.trim()) return;
@@ -146,83 +149,96 @@ function ChatPage() {
     };
 
     try {
+      // 1) Post to your (now-streaming) /send-message
       const response = await fetch("http://localhost:5000/api/send-message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await response.json();
-      if (response.ok) {
-        if (data.cost) {
-          setAssignmentCredits((prev) => prev - data.cost);
-          setLastCost(data.cost);
-        }
-        const updatedChatId = data.chat_id;
-        setChats((prevChats) =>
-          prevChats.map((chat) => {
-            if (!chat.id && selectedChatId === null) {
-              return {
-                ...chat,
-                id: updatedChatId,
-                title: data.chat_title ? data.chat_title : chat.title,
-                messages: chat.messages.map((msg) =>
-                  msg.placeholder
-                    ? { ...msg, content: data.bot_response, placeholder: false }
-                    : msg
-                ),
-              };
-            } else if (chat.id === updatedChatId) {
-              return {
-                ...chat,
-                title: data.chat_title ? data.chat_title : chat.title,
-                messages: chat.messages.map((msg) =>
-                  msg.placeholder
-                    ? { ...msg, content: data.bot_response, placeholder: false }
-                    : msg
-                ),
-              };
-            }
-            return chat;
-          })
-        );
-        setSelectedChatId(updatedChatId);
-        // Clear input only on successful submission
-        setInput("");
-      } else {
-        // Handle error cases - keep input text and remove placeholder message
-        if (response.status === 403 && data.error === "Insufficient credits") {
-          // Show alert for insufficient credits
-          alert(`❌ ${data.message || "You have negative credits and cannot submit new prompts."}\n\nCurrent Credits: ${data.current_credits ? data.current_credits.toFixed(5) : 'N/A'} USD\n\nPlease request additional credits from your instructor.`);
-        } else {
-          // Show generic error alert
-          alert(`❌ Error: ${data.error || "Failed to send message"}`);
-        }
-        
-        // Remove the placeholder message from the chat
+
+      if (!response.ok || !response.body) {
+        // Let your existing error flow handle it in catch
+        throw new Error("Stream failed to start");
+      }
+
+      // 2) Read the SSE stream and update the placeholder as tokens arrive
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let accumulated = "";
+
+      const applyChunk = (chunk) => {
+        accumulated += chunk;
         setChats((prevChats) =>
           prevChats.map((chat) =>
             chat.id === selectedChatId || (!chat.id && selectedChatId === null)
               ? {
                   ...chat,
-                  messages: chat.messages.slice(0, -2), // Remove both user message and placeholder
+                  messages: chat.messages.map((m) =>
+                    m.placeholder ? { ...m, content: accumulated } : m
+                  ),
                 }
               : chat
           )
         );
-        console.error("Error sending message:", data.error);
+      };
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // SSE messages are separated by a blank line
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() ?? "";
+
+        for (const part of parts) {
+          const line = part.split("\n").find((l) => l.startsWith("data: "));
+          if (!line) continue;
+
+          const msg = JSON.parse(line.slice(6)); // remove "data: "
+
+          if (msg.type === "token") {
+            applyChunk(msg.data);
+          } else if (msg.type === "done") {
+            // Optional: update credits if your backend included "cost"
+            if (typeof msg.cost === "number") {
+              setAssignmentCredits((prev) => prev - msg.cost);
+              setLastCost(msg.cost);
+            }
+
+            // Finalize the placeholder message and set chat_id/title
+            setChats((prev) =>
+              prev.map((chat) => {
+                const isNew = !chat.id && selectedChatId === null;
+                const matches = isNew || chat.id === msg.chat_id;
+                if (!matches) return chat;
+                return {
+                  ...chat,
+                  id: msg.chat_id ?? chat.id,
+                  title: msg.chat_title || chat.title,
+                  messages: chat.messages.map((m) =>
+                    m.placeholder ? { ...m, content: msg.final, placeholder: false } : m
+                  ),
+                };
+              })
+            );
+            setSelectedChatId((prev) => prev || msg.chat_id);
+            setInput(""); // clear input after success
+          } else if (msg.type === "error") {
+            // Surface server-side streaming errors to your existing error flow
+            throw new Error(msg.message || "Streaming error");
+          }
+        }
       }
     } catch (error) {
-      // Handle network/unexpected errors - keep input text and remove placeholder
+      // keep your existing catch block unchanged
       alert("❌ Network error: Failed to send message. Please check your connection and try again.");
-      
-      // Remove the placeholder message from the chat
       setChats((prevChats) =>
         prevChats.map((chat) =>
           chat.id === selectedChatId || (!chat.id && selectedChatId === null)
-            ? {
-                ...chat,
-                messages: chat.messages.slice(0, -2), // Remove both user message and placeholder
-              }
+            ? { ...chat, messages: chat.messages.slice(0, -2) }
             : chat
         )
       );

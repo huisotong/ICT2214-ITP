@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, Response, stream_with_context
 from app.models.module_assignment import ModuleAssignment
 from app.models.module import Module
 from app.models.users import User
@@ -20,6 +20,10 @@ from io import BytesIO
 import traceback
 from datetime import datetime
 import requests
+from queue import Queue
+from threading import Thread
+import json
+from langchain.callbacks.base import BaseCallbackHandler
 from langchain.schema import HumanMessage
 from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI
@@ -45,11 +49,6 @@ def get_qdrant_client():
         timeout=10.0,
         check_compatibility=False
     )
-
-"""
-TODO: redo cost estimation function. 
-(call https://openrouter.ai/api/v1/models, get model pricing, estimate toks, calculate cost)
-"""
 
 # Function to extract text
 def extract_text_from_file(file):
@@ -340,59 +339,58 @@ def untag_document():
         return jsonify({"error": str(e)}), 500
 
 
+# Sends user's message and streams chatbot's response
 @chatbot_bp.route('/send-message', methods=['POST'])
 def send_message():
     try:
         data = request.get_json()
 
-        chat_id = data.get("chat_id")  
+        chat_id = data.get("chat_id")
         user_message = data.get("message")
         module_id = data.get("module_id")
         model_override = data.get("model")
-        user_id = data.get("user_id")  
+        user_id = data.get("user_id")
 
-        # Added user_id to the check, for credit deduction
+        # 1) Validate + assignment
         if not module_id or not user_message or not user_id:
             return jsonify({"error": "module_id, message, and user_id are required"}), 400
-          # Fetch user assignment and settings early for access to credits and model name
+
         assignment = ModuleAssignment.query.filter_by(userID=user_id, moduleID=str(module_id)).first()
         if not assignment:
             return jsonify({"error": "No assignment found for the given user and module"}), 404
-        
-        # Check if user has negative credits - prevent submission if so
-        if assignment.studentCredits < 0:
+
+        # Negative credit gate (same as your original)
+        if assignment.studentCredits is not None and assignment.studentCredits < 0:
             return jsonify({
-                "error": "Insufficient credits", 
+                "error": "Insufficient credits",
                 "message": "You have negative credits and cannot submit new prompts. Please request additional credits from your instructor.",
                 "current_credits": assignment.studentCredits
             }), 403
-        
-        chat_session = None
-        # For the first message, create a new chat session.
+
+        # 2) Chat session (create or fetch)
         if not chat_id:
             new_chat = ChatHistory(
                 assignmentID=assignment.assignmentID,
-                chatlog="",  # Will be replaced.
+                chatlog="",   # You store the generated title here
                 dateStarted=datetime.utcnow()
             )
             db.session.add(new_chat)
             db.session.commit()
             chat_id = new_chat.historyID
             chat_session = new_chat
-
-        # If there's existing chat
         else:
             chat_session = ChatHistory.query.filter_by(historyID=chat_id).first()
             if not chat_session:
                 return jsonify({"error": "Chat session not found"}), 404
-        
+
+        # 3) Settings (+ optional model override)
         settings = ChatbotSettings.query.filter_by(moduleID=str(module_id)).first()
         if not settings:
             return jsonify({"error": "Model settings not found for this module"}), 404
-
         if model_override:
             settings.model = model_override
 
+        # 4) Pricing lookup (OpenRouter) — unchanged behavior
         try:
             models_response = requests.get("https://openrouter.ai/api/v1/models")
             models_response.raise_for_status()
@@ -402,18 +400,16 @@ def send_message():
             return jsonify({"error": "Could not fetch model pricing. Please try again."}), 500
 
         model_info = next((m for m in models_data if m.get("id") == settings.model), None)
-
         if not model_info:
             return jsonify({"error": f"Could not find pricing information for model: {settings.model}"}), 500
-
         pricing = model_info.get("pricing", {})
         prompt_price = float(pricing.get("prompt", 0))
         completion_price = float(pricing.get("completion", 0))
 
-        if settings.system_prompt:
-            system_context = f"System Context: {settings.system_prompt}\n\n"
+        # 5) System context
+        system_context = f"System Context: {settings.system_prompt}\n\n" if settings.system_prompt else ""
 
-        # Build conversation history from previous messages.
+        # 6) Build conversation history (your schema uses chatID on ChatMessage)
         previous_messages = (
             db.session.query(ChatMessage)
             .filter_by(chatID=chat_id)
@@ -433,14 +429,12 @@ def send_message():
                 conversation_history.append((current_pair["user"] or "", current_pair["ai"] or ""))
                 current_pair = {"user": None, "ai": None}
 
-        # For the first message, generate a chat title from the user's input.
+        # 7) Generate a chat title on first message (same logic)
         if not previous_messages:
-            print("There is no existing messages!")
             title_prompt = (
                 f"Provide one short, descriptive chat title for the following conversation. "
                 f"Return only the title, without numbering or additional commentary: {user_message}"
             )
-
             llm_for_title = ChatOpenAI(
                 model_name=settings.model,
                 temperature=0.7,
@@ -454,13 +448,11 @@ def send_message():
                 chat_title = chat_title[1:-1].strip()
             elif chat_title.startswith("'") and chat_title.endswith("'"):
                 chat_title = chat_title[1:-1].strip()
-            # Save the generated title only once.
             chat_session.chatlog = chat_title
             db.session.commit()
 
-        # Retrieve documents from Qdrant.
+        # 8) Qdrant: detect if documents exist (same)
         collection_name = f"module_{module_id}"
-        print("collection_name",collection_name)
         client = get_qdrant_client()
         try:
             documents = client.scroll(collection_name=collection_name)[0]
@@ -468,125 +460,153 @@ def send_message():
             print(f"Error fetching documents from Qdrant: {str(q_err)}")
             documents = []
 
-        # Generate the bot response.
-        if documents:  # When documents exist, use the ConversationalRetrievalChain.
-            embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-base-en-v1.5")
-            vectorstore = QdrantVectorStore(
-                client=client,
-                collection_name=collection_name,
-                embedding=embeddings
-            )
-            retriever = vectorstore.as_retriever(
-                search_kwargs={
-                    "k": 3,  # Increase how many to return
-                    "score_threshold": 0.5  # Accept even loosely matched chunks
-                }
-            )
-            prompt_template = PromptTemplate(
-                input_variables=["context", "question"],
-                template="""
-                You are a helpful assistant. Use the following context to answer the question.
+        # ===== Streaming setup =====
+        class _QueueTokenHandler(BaseCallbackHandler):
+            def __init__(self, q):
+                self.q = q
+            def on_llm_new_token(self, token: str, **kwargs):
+                self.q.put({"type": "token", "data": token})
+            def on_llm_end(self, response, **kwargs):
+                self.q.put({"type": "lc_end"})
 
-                Context:
-                {context}
+        def _sse(data: dict) -> bytes:
+            return f"data: {json.dumps(data, ensure_ascii=False)}\n\n".encode("utf-8")
 
-                Question: {question}
-                """
+        q = Queue()
+        cb = _QueueTokenHandler(q)
+
+        streaming_llm = ChatOpenAI(
+            model_name=settings.model,
+            temperature=settings.temperature,
+            max_tokens=settings.max_tokens,
+            streaming=True,
+            callbacks=[cb],
+            openai_api_key=os.getenv("OPENROUTER_API_KEY"),
+            openai_api_base=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+        )
+
+        accumulated = {"text": ""}
+        usage = {"prompt": 0, "completion": 0}  # to collect tokens for costing
+
+        # Producer runs the LLM chain and pushes tokens into the queue
+        def _producer():
+            try:
+                with get_openai_callback() as cb_usage:
+                    if documents:
+                        embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-base-en-v1.5")
+                        vectorstore = QdrantVectorStore(
+                            client=client,
+                            collection_name=collection_name,
+                            embedding=embeddings
+                        )
+                        retriever = vectorstore.as_retriever(
+                            search_kwargs={"k": 3, "score_threshold": 0.5}
+                        )
+
+                        prompt_template = PromptTemplate(
+                            input_variables=["context", "question"],
+                            template=(
+                                "You are a helpful assistant. Use the following context to answer the question.\n\n"
+                                "Context:\n{context}\n\nQuestion: {question}"
                             )
-            # Run similarity search
-            docs_and_scores = vectorstore.similarity_search_with_score(user_message, k=3)
+                        )
 
-            # Print similarity score and filename from metadata
-            for doc, score in docs_and_scores:
-                filename = doc.metadata.get("filename", "Unknown")
-                print(f"📄 SCORE: {score:.4f} — ({filename}) {doc.page_content[:100]}")
+                        chain = ConversationalRetrievalChain.from_llm(
+                            llm=streaming_llm,
+                            retriever=retriever,
+                            return_source_documents=True,
+                            combine_docs_chain_kwargs={"prompt": prompt_template}
+                        )
+                        chain_input = {"question": system_context + user_message, "chat_history": conversation_history}
+                        chain.invoke(chain_input)  # triggers callbacks -> tokens go to queue
+                    else:
+                        # No-docs path: stitch like your original
+                        prompt_text = system_context
+                        if conversation_history:
+                            for pair in conversation_history:
+                                prompt_text += f"User: {pair[0]}\nAI: {pair[1]}\n"
+                        prompt_text += f"User: {user_message}\nAI:"
+                        streaming_llm.invoke([HumanMessage(content=prompt_text)])
 
-            prompt_tokens = 0
-            completion_tokens = 0
-            
-            with get_openai_callback() as cb:
-                chain = ConversationalRetrievalChain.from_llm(
-                    llm=ChatOpenAI(
-                        model_name=settings.model,
-                        temperature=settings.temperature,
-                        max_tokens=settings.max_tokens,
-                        openai_api_key=os.getenv("OPENROUTER_API_KEY"),
-                        openai_api_base=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
-                    ),
-                    retriever=retriever,
-                    return_source_documents=True,
-                    combine_docs_chain_kwargs={"prompt": prompt_template}
-                )
-                chain_input = {"question": system_context + user_message, "chat_history": conversation_history}
-                chain_result = chain.invoke(chain_input)
-                bot_response = chain_result.get("answer", "I'm sorry, I couldn't generate a response.")
-                prompt_tokens = cb.prompt_tokens
-                completion_tokens = cb.completion_tokens
+                    # capture token usage after generation completes
+                    usage["prompt"] = cb_usage.prompt_tokens or 0
+                    usage["completion"] = cb_usage.completion_tokens or 0
 
-        # No documents: build prompt from conversation_history.
-        else:  
-            prompt_text = ""
-            prompt_text += system_context
-            if conversation_history:
-                for pair in conversation_history:
-                    prompt_text += f"User: {pair[0]}\nAI: {pair[1]}\n"
-            prompt_text += f"User: {user_message}\nAI:"
-            llm = ChatOpenAI(
-                model_name=settings.model,
-                temperature=settings.temperature,
-                max_tokens=settings.max_tokens,
-                openai_api_key=os.getenv("OPENROUTER_API_KEY"),
-                openai_api_base=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
-            )
-            
-            llm_result = llm.invoke([HumanMessage(content=prompt_text)])
-            bot_response = llm_result.content
-            token_usage = llm_result.response_metadata.get("token_usage", {})
-            prompt_tokens = token_usage.get("prompt_tokens", 0)
-            completion_tokens = token_usage.get("completion_tokens", 0)
+            except Exception as e:
+                q.put({"type": "error", "message": str(e)})
+            finally:
+                q.put({"type": "end"})
 
+        t = Thread(target=_producer, daemon=True)
+        t.start()
 
-        # Calculate cost and deduct from the student's credit balance
-        cost = (prompt_tokens * prompt_price) + (completion_tokens * completion_price)
-        print("Cost of this request:", cost)
-        print("Student credit before deduction:", assignment.studentCredits)
-        assignment.studentCredits -= cost
-        print("Student credit after deduction:", assignment.studentCredits)
+        @stream_with_context
+        def event_stream():
+            # Start event
+            yield _sse({"type": "start"})
 
-        # Save the user's message.
-        user_msg = ChatMessage(
-            chatID=chat_id,
-            sender="user",
-            content=user_message,
-            timestamp=datetime.utcnow()
-        )
-        # Save the bot's response.
-        bot_msg = ChatMessage(
-            chatID=chat_id,
-            sender="ai",
-            content=bot_response,
-            timestamp=datetime.utcnow()
-        )
+            while True:
+                item = q.get()
+                if item["type"] == "token":
+                    tok = item["data"]
+                    accumulated["text"] += tok
+                    yield _sse({"type": "token", "data": tok})
+                elif item["type"] == "error":
+                    yield _sse({"type": "error", "message": item.get("message", "unknown error")})
+                    break
+                elif item["type"] in ("lc_end", "end"):
+                    # 9) Costing & credit deduction
+                    try:
+                        cost = (usage["prompt"] * prompt_price) + (usage["completion"] * completion_price)
+                        # Deduct and save assignment first
+                        if assignment.studentCredits is not None:
+                            assignment.studentCredits -= cost
+                        db.session.add(assignment)
 
-        # Add all changes to the session and commit once.
-        db.session.add(assignment)
-        db.session.add(user_msg)
-        db.session.add(bot_msg)
-        db.session.commit()
+                        # Save both messages now
+                        user_msg = ChatMessage(
+                            chatID=chat_id,
+                            sender="user",
+                            content=user_message,
+                            timestamp=datetime.utcnow()
+                        )
+                        bot_msg = ChatMessage(
+                            chatID=chat_id,
+                            sender="ai",
+                            content=accumulated["text"],
+                            timestamp=datetime.utcnow()
+                        )
+                        db.session.add(user_msg)
+                        db.session.add(bot_msg)
+                        db.session.commit()
+                    except Exception as e:
+                        db.session.rollback()
+                        yield _sse({"type": "error", "message": f"Failed to save or deduct credits: {str(e)}"})
+                        break
 
-        # IMPORTANT: Do not update the chatlog once the title is generated.
-        return jsonify({
-            "chat_id": chat_id,
-            "user_message": user_message,
-            "bot_response": bot_response,
-            "chat_title": chat_session.chatlog,
-            "cost": cost
-        }), 200
+                    # 10) Final "done"
+                    yield _sse({
+                        "type": "done",
+                        "chat_id": chat_id,
+                        "chat_title": chat_session.chatlog,  # title stored in chatlog in your schema
+                        "final": accumulated["text"],
+                        "cost": cost
+                    })
+                    break
+
+        headers = {
+            "Content-Type": "text/event-stream; charset=utf-8",
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # if behind nginx
+        }
+        return Response(event_stream(), headers=headers)
 
     except Exception as e:
         traceback.print_exc()
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
+
 
 
 @chatbot_bp.route('/get-chat-history/<int:chat_id>', methods=['GET'])
