@@ -54,6 +54,12 @@ export default function NavBar() {
         >
           Home
         </Link>
+        <Link
+          to="/marketplace"
+          className="flex items-center gap-1 font-semibold text-lg text-black hover:text-sit-orange ml-4"
+        >
+          Marketplace
+        </Link>
         {user?.role === "Admin" && (
           <>
             <Link

@@ -5,6 +5,7 @@ from app.models.users import User
 from app.models.chat_history import ChatHistory
 from app.models.chat_message import ChatMessage
 from app.models.chatbot_settings import ChatbotSettings
+from app.models.agent import Agent
 from app.db import db
 from pathlib import Path
 from qdrant_client import QdrantClient
@@ -348,32 +349,50 @@ def send_message():
         chat_id = data.get("chat_id")
         user_message = data.get("message")
         module_id = data.get("module_id")
+        agent_id = data.get("agent_id")
         model_override = data.get("model")
         user_id = data.get("user_id")
 
-        # 1) Validate + assignment
-        if not module_id or not user_message or not user_id:
-            return jsonify({"error": "module_id, message, and user_id are required"}), 400
+        # 1) Validate + assignment/agent
+        if not user_message or not user_id:
+            return jsonify({"error": "message and user_id are required"}), 400
 
-        assignment = ModuleAssignment.query.filter_by(userID=user_id, moduleID=str(module_id)).first()
-        if not assignment:
-            return jsonify({"error": "No assignment found for the given user and module"}), 404
+        if module_id and agent_id:
+            return jsonify({"error": "Cannot specify both module_id and agent_id"}), 400
 
-        # Negative credit gate (same as your original)
-        if assignment.studentCredits is not None and assignment.studentCredits < 0:
-            return jsonify({
-                "error": "Insufficient credits",
-                "message": "You have negative credits and cannot submit new prompts. Please request additional credits from your instructor.",
-                "current_credits": assignment.studentCredits
-            }), 403
+        if not module_id and not agent_id:
+            return jsonify({"error": "Either module_id or agent_id is required"}), 400
+
+        assignment = None
+        if module_id:
+            assignment = ModuleAssignment.query.filter_by(userID=user_id, moduleID=str(module_id)).first()
+            if not assignment:
+                return jsonify({"error": "No assignment found for the given user and module"}), 404
+
+            # Negative credit gate for module-based chats
+            if assignment.studentCredits is not None and assignment.studentCredits < 0:
+                return jsonify({
+                    "error": "Insufficient credits",
+                    "message": "You have negative credits and cannot submit new prompts. Please request additional credits from your instructor.",
+                    "current_credits": assignment.studentCredits
+                }), 403
 
         # 2) Chat session (create or fetch)
         if not chat_id:
-            new_chat = ChatHistory(
-                assignmentID=assignment.assignmentID,
-                chatlog="",   # You store the generated title here
-                dateStarted=datetime.utcnow()
-            )
+            if module_id:
+                new_chat = ChatHistory(
+                    assignmentID=assignment.assignmentID,
+                    chatlog="",   # You store the generated title here
+                    dateStarted=datetime.utcnow()
+                )
+            else:
+                # For agent-based chats, create a chat session with agentID
+                new_chat = ChatHistory(
+                    assignmentID=None,  # No assignment for agent chats
+                    agentID=agent_id,   # Link to the agent
+                    chatlog="",   # You store the generated title here
+                    dateStarted=datetime.utcnow()
+                )
             db.session.add(new_chat)
             db.session.commit()
             chat_id = new_chat.historyID
@@ -384,27 +403,49 @@ def send_message():
                 return jsonify({"error": "Chat session not found"}), 404
 
         # 3) Settings (+ optional model override)
-        settings = ChatbotSettings.query.filter_by(moduleID=str(module_id)).first()
-        if not settings:
-            return jsonify({"error": "Model settings not found for this module"}), 404
-        if model_override:
-            settings.model = model_override
+        if module_id:
+            settings = ChatbotSettings.query.filter_by(moduleID=str(module_id)).first()
+            if not settings:
+                return jsonify({"error": "Model settings not found for this module"}), 404
+            if model_override:
+                settings.model = model_override
+        else:
+            # For agent-based chats, get settings from the agent
+            agent = Agent.query.filter_by(agentID=agent_id).first()
+            if not agent:
+                return jsonify({"error": "Agent not found"}), 404
+            
+            # Create a settings-like object from agent data
+            class AgentSettings:
+                def __init__(self, agent):
+                    self.model = agent.model
+                    self.temperature = agent.temperature
+                    self.system_prompt = agent.system_prompt
+                    self.max_tokens = agent.max_tokens
+            
+            settings = AgentSettings(agent)
+            if model_override:
+                settings.model = model_override
 
-        # 4) Pricing lookup (OpenRouter) — unchanged behavior
-        try:
-            models_response = requests.get("https://openrouter.ai/api/v1/models")
-            models_response.raise_for_status()
-            models_data = models_response.json().get("data", [])
-        except requests.exceptions.RequestException as e:
-            print(f"Could not fetch model pricing from OpenRouter: {e}")
-            return jsonify({"error": "Could not fetch model pricing. Please try again."}), 500
+        # 4) Pricing lookup (OpenRouter) — only for module-based chats
+        prompt_price = 0
+        completion_price = 0
+        
+        if module_id:  # Only calculate costs for module-based chats
+            try:
+                models_response = requests.get("https://openrouter.ai/api/v1/models")
+                models_response.raise_for_status()
+                models_data = models_response.json().get("data", [])
+            except requests.exceptions.RequestException as e:
+                print(f"Could not fetch model pricing from OpenRouter: {e}")
+                return jsonify({"error": "Could not fetch model pricing. Please try again."}), 500
 
-        model_info = next((m for m in models_data if m.get("id") == settings.model), None)
-        if not model_info:
-            return jsonify({"error": f"Could not find pricing information for model: {settings.model}"}), 500
-        pricing = model_info.get("pricing", {})
-        prompt_price = float(pricing.get("prompt", 0))
-        completion_price = float(pricing.get("completion", 0))
+            model_info = next((m for m in models_data if m.get("id") == settings.model), None)
+            if not model_info:
+                return jsonify({"error": f"Could not find pricing information for model: {settings.model}"}), 500
+            pricing = model_info.get("pricing", {})
+            prompt_price = float(pricing.get("prompt", 0))
+            completion_price = float(pricing.get("completion", 0))
 
         # 5) System context
         system_context = f"System Context: {settings.system_prompt}\n\n" if settings.system_prompt else ""
@@ -555,13 +596,15 @@ def send_message():
                     yield _sse({"type": "error", "message": item.get("message", "unknown error")})
                     break
                 elif item["type"] in ("lc_end", "end"):
-                    # 9) Costing & credit deduction
+                    # 9) Costing & credit deduction (only for module-based chats)
                     try:
-                        cost = (usage["prompt"] * prompt_price) + (usage["completion"] * completion_price)
-                        # Deduct and save assignment first
-                        if assignment.studentCredits is not None:
-                            assignment.studentCredits -= cost
-                        db.session.add(assignment)
+                        cost = 0
+                        if module_id:  # Only calculate costs for module-based chats
+                            cost = (usage["prompt"] * prompt_price) + (usage["completion"] * completion_price)
+                            # Deduct and save assignment
+                            if assignment and assignment.studentCredits is not None:
+                                assignment.studentCredits -= cost
+                                db.session.add(assignment)
 
                         # Save both messages now
                         user_msg = ChatMessage(

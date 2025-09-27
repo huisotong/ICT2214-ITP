@@ -18,6 +18,10 @@ import ManageCreditRequests from "./pages/ManageCreditRequests"; // Import the n
 import RequestCreditsPage from "./pages/RequestCreditsPage";
 import ChatPage from "./pages/ChatPage";
 import ProfilePage from "./pages/ProfilePage";
+import MarketplacePage from "./pages/MarketplacePage";
+import CreateAgentPage from "./pages/CreateAgentPage";
+import EditAgentPage from "./pages/EditAgentPage";
+import SharedAgentPage from "./pages/SharedAgentPage";
 import ProtectedLayout from "./components/global/ProtectedLayout";
 
 function App() {
@@ -44,7 +48,7 @@ function App() {
     <NotificationProvider>
       {/* Show global modal if active */}
       {modal.active && <Modal modal={modal} />}
-      
+
       {/* Show notification popup */}
       <NotificationPopup />
 
@@ -60,11 +64,9 @@ function App() {
             }
           >
             {/* Add more routes that req auth here */}
-            <Route
-              path="/home"
-              element={<HomePage setModal={setModal} />}
-            />
+            <Route path="/home" element={<HomePage setModal={setModal} />} />
             <Route path="/chat/:id" element={<ChatPage />} />
+            <Route path="/chat/agent/:id" element={<ChatPage />} />
             <Route
               path="/profile"
               element={<ProfilePage user={auth.user} setModal={setModal} />}
@@ -82,7 +84,24 @@ function App() {
               path="/request-credits"
               element={<RequestCreditsPage setModal={setModal} />}
             />
-          </Route>        </Routes>
+            <Route
+              path="/marketplace"
+              element={<MarketplacePage setModal={setModal} />}
+            />
+            <Route
+              path="/marketplace/create"
+              element={<CreateAgentPage setModal={setModal} />}
+            />
+            <Route
+              path="/marketplace/edit/:agentId"
+              element={<EditAgentPage setModal={setModal} />}
+            />
+            <Route
+              path="/marketplace/share/:shareToken"
+              element={<SharedAgentPage setModal={setModal} />}
+            />
+          </Route>{" "}
+        </Routes>
       </main>
     </NotificationProvider>
   );
