@@ -11,6 +11,7 @@ from .routes.credit_requests_bp import credit_requests_bp
 from .routes.add_students_bp import add_students_bp
 from .routes.chatbot_bp import chatbot_bp
 from .routes.marketplace_bp import marketplace_bp
+from .routes.sandbox_bp import sandbox_bp
 from sqlalchemy import text
 
 # Initialise app
@@ -61,6 +62,7 @@ def create_app():
     app.register_blueprint(add_students_bp, url_prefix='/api')
     app.register_blueprint(chatbot_bp, url_prefix='/api')
     app.register_blueprint(marketplace_bp, url_prefix='/api')
+    app.register_blueprint(sandbox_bp, url_prefix='/api')
 
 
     # Test database connection
