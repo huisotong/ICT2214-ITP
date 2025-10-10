@@ -381,8 +381,8 @@ def send_message():
         internet_search = data.get("internet_search", False)
 
         # 1) Validate + assignment/agent
-        if not user_message or not user_id:
-            return jsonify({"error": "message and user_id are required"}), 400
+        if not user_message or not user_id or not module_id:
+            return jsonify({"error": "module_id, message, and user_id are required"}), 400
 
         if module_id and agent_id:
             return jsonify({"error": "Cannot specify both module_id and agent_id"}), 400
