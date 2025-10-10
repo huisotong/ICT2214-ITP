@@ -34,6 +34,8 @@ function ChatPage() {
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const [internetSearch, setInternetSearch] = useState(false);
+
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -206,8 +208,9 @@ function ChatPage() {
       chat_id: selectedChatId ? selectedChatId : null,
       user_id: userId,
       message: messageToSend,
+      internet_search: internetSearch
     };
-
+    
     // Only add module_id or agent_id if they exist and are not null
     if (moduleId && moduleId !== null) {
       payload.module_id = moduleId;
@@ -215,7 +218,9 @@ function ChatPage() {
     if (agentId && agentId !== null) {
       payload.agent_id = agentId;
     }
-
+    if (internetSearch) {
+      payload.internet_search = true;
+    }
     console.log("Sending payload:", payload);
     console.log("User ID:", userId);
     console.log("Module ID:", moduleId, "Type:", typeof moduleId);
@@ -582,6 +587,26 @@ function ChatPage() {
           )}
           <div ref={messagesEndRef} />
         </div>{" "}
+
+        {/* Internet Search Toggle */}
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "flex-start",
+          gap: "8px",
+          marginLeft: "1rem",
+          marginBottom: "4px"
+        }}>
+          <input
+            type="checkbox"
+            id="internetSearchToggle"
+            checked={internetSearch}
+            onChange={(e) => setInternetSearch(e.target.checked)}
+          />
+          <label htmlFor="internetSearchToggle" style={{ fontSize: "14px" }}>
+            🌐 Enable Internet Search
+          </label>
+        </div>
         {/* Input box / Form: pinned to bottom */}
         <form
           onSubmit={handleSend}

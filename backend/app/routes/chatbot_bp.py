@@ -1,4 +1,5 @@
 from flask import Blueprint, jsonify, request, Response, stream_with_context
+from flask import current_app
 from app.models.module_assignment import ModuleAssignment
 from app.models.module import Module
 from app.models.users import User
@@ -50,6 +51,30 @@ def get_qdrant_client():
         timeout=10.0,
         check_compatibility=False
     )
+
+def internet_search_results(query, num_results=5):
+    api_key = os.getenv("GOOGLE_API_KEY")
+    cse_id = os.getenv("GOOGLE_CSE_ID")
+    if not api_key or not cse_id:
+        return ""
+    try:
+        response = requests.get(
+            "https://www.googleapis.com/customsearch/v1",
+            params={"key": api_key, "cx": cse_id, "q": query, "num": num_results},
+            timeout=10
+        )
+        data = response.json()
+        items = data.get("items", [])
+        results = []
+        for item in items:
+            snippet = item.get("snippet", "")
+            title = item.get("title", "")
+            if snippet:
+                results.append(f"{title}: {snippet}")
+        return "\n".join(results)
+    except Exception as e:
+        print(f"❌ Internet search failed: {e}")
+        return ""
 
 # Function to extract text
 def extract_text_from_file(file):
@@ -135,6 +160,7 @@ def tag_document_to_qdrant(module_id: str, file_content: str, filename: str):
 
     # Step 4: Connect to Qdrant vector database
     client = get_qdrant_client()
+    print(f"Connecting to Qdrant at: {os.getenv('QDRANT_HOST')}")
     collection_name = f"module_{module_id}"
 
     # Step 5: Create collection if it doesn't exist yet
@@ -352,6 +378,7 @@ def send_message():
         agent_id = data.get("agent_id")
         model_override = data.get("model")
         user_id = data.get("user_id")
+        internet_search = data.get("internet_search", False)
 
         # 1) Validate + assignment/agent
         if not user_message or not user_id:
@@ -496,10 +523,16 @@ def send_message():
         collection_name = f"module_{module_id}"
         client = get_qdrant_client()
         try:
-            documents = client.scroll(collection_name=collection_name)[0]
+            # Instead of fetching .scroll(), check if collection actually exists
+            collections = [c.name for c in client.get_collections().collections]
+            if collection_name in collections:
+                documents = True  # Flag that Qdrant context is available
+            else:
+                documents = False
         except Exception as q_err:
-            print(f"Error fetching documents from Qdrant: {str(q_err)}")
-            documents = []
+            print(f"Error checking Qdrant collection existence: {str(q_err)}")
+            documents = False
+
 
         # ===== Streaming setup =====
         class _QueueTokenHandler(BaseCallbackHandler):
@@ -529,57 +562,109 @@ def send_message():
         accumulated = {"text": ""}
         usage = {"prompt": 0, "completion": 0}  # to collect tokens for costing
 
-        # Producer runs the LLM chain and pushes tokens into the queue
+                # Producer runs the LLM chain and pushes tokens into the queue
         def _producer():
             try:
                 with get_openai_callback() as cb_usage:
+                    search_context = ""
+                    if internet_search:
+                        try:
+                            search_context = internet_search_results(user_message)
+                        except Exception as e:
+                            print("Internet search failed:", e)
+                            search_context = ""
+
+                    # If the collection exists we built 'documents' flag earlier
                     if documents:
                         embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-base-en-v1.5")
-                        vectorstore = QdrantVectorStore(
-                            client=client,
-                            collection_name=collection_name,
-                            embedding=embeddings
-                        )
-                        retriever = vectorstore.as_retriever(
-                            search_kwargs={"k": 3, "score_threshold": 0.5}
-                        )
+                        vectorstore = QdrantVectorStore(client=client, collection_name=collection_name, embedding=embeddings)
+                        retriever = vectorstore.as_retriever(search_kwargs={"k": 3, "score_threshold": 0.5})
 
-                        prompt_template = PromptTemplate(
-                            input_variables=["context", "question"],
-                            template=(
-                                "You are a helpful assistant. Use the following context to answer the question.\n\n"
-                                "Context:\n{context}\n\nQuestion: {question}"
+                        # 1) Get top retrieved docs first (synchronous check)
+                        retrieved_docs = retriever.get_relevant_documents(user_message) or []
+                        print(f"Retrieved {len(retrieved_docs)} docs for query: {user_message}")
+
+                        # 2) If no retrieved docs AND internet_search is False => immediately respond "outside scope"
+                        if not retrieved_docs and not search_context:
+                            print("⚠️ No docs found, sending outside-scope message.")
+                            outside_msg = "I'm sorry — this topic is outside this module's scope. Please enable Internet Search for an open-web answer."
+                            # push one 'token' event first so frontend displays text
+                            q.put({"type": "token", "data": outside_msg})
+                            q.put({
+                                "type": "done",
+                                "final": outside_msg,
+                                "chat_id": chat_id,
+                                "chat_title": chat_session.chatlog,
+                                "cost": 0
+                            })
+                            return
+                        # 3) Build combined context: docs (if any) + web snippets (if any)
+                        combined_context = ""
+                        if retrieved_docs:
+                            combined_context += "\n\n".join([d.page_content for d in retrieved_docs])
+                        if search_context:
+                            if combined_context:
+                                combined_context += "\n\n"
+                            combined_context += f"[Web Snippets]\n{search_context}"
+
+                        # 4) Create a strict system instruction depending on internet_search
+                        if search_context:
+                            # allow mixing of docs + web
+                            system_instr = (
+                                "You are a teaching assistant for this course. Use the documents from the module first, "
+                                "and also the provided web snippets. Answer accurately and concisely, and cite sources when helpful."
                             )
+                        else:
+                            # docs only -> restrict to docs
+                            system_instr = (
+                                "You are a teaching assistant for this course. Only answer using the provided module documents. "
+                                "If the answer cannot be found in the documents, reply: "
+                                "'I'm sorry, this topic is outside the module’s scope.' Do not use your own external knowledge."
+                            )
+
+                        prompt = (
+                            f"{system_instr}\n\nContext:\n{combined_context}\n\nQuestion: {user_message}\nAI:"
                         )
 
-                        chain = ConversationalRetrievalChain.from_llm(
-                            llm=streaming_llm,
-                            retriever=retriever,
-                            return_source_documents=True,
-                            combine_docs_chain_kwargs={"prompt": prompt_template}
-                        )
-                        chain_input = {"question": system_context + user_message, "chat_history": conversation_history}
-                        chain.invoke(chain_input)  # triggers callbacks -> tokens go to queue
+                        # 5) Stream tokens from the LLM using the same streaming_llm and callbacks
+                        streaming_llm.invoke([HumanMessage(content=prompt)])
+
                     else:
-                        # No-docs path: stitch like your original
-                        prompt_text = system_context
-                        if conversation_history:
-                            for pair in conversation_history:
-                                prompt_text += f"User: {pair[0]}\nAI: {pair[1]}\n"
-                        prompt_text += f"User: {user_message}\nAI:"
-                        streaming_llm.invoke([HumanMessage(content=prompt_text)])
+                        # No qdrant collection at all: fallback
+                        # if internet_search is enabled => use web
+                        if internet_search and search_context:
+                            prompt_text = (
+                                f"Use the following web snippets to answer the question. "
+                                f"Web snippets:\n{search_context}\n\nQuestion: {user_message}\nAI:"
+                            )
+                            streaming_llm.invoke([HumanMessage(content=prompt_text)])
+                        else:
+                            # No docs and internet search disabled -> outside scope
+                            outside_msg = "I'm sorry — this topic is outside this module's scope. Please enable Internet Search for an open-web answer."
+                            q.put({"type": "done", "final": outside_msg, "chat_id": chat_id, "chat_title": chat_session.chatlog, "cost": 0})
 
-                    # capture token usage after generation completes
+                    # Track token usage after LLM returns
                     usage["prompt"] = cb_usage.prompt_tokens or 0
                     usage["completion"] = cb_usage.completion_tokens or 0
 
             except Exception as e:
+                print("❌ Exception inside _producer:", e)
                 q.put({"type": "error", "message": str(e)})
             finally:
                 q.put({"type": "end"})
 
-        t = Thread(target=_producer, daemon=True)
+
+        # Capture the current Flask app *while still inside the request context*
+        flask_app = current_app._get_current_object()
+
+        def thread_wrapper():
+            # Push the captured app context into the new thread
+            with flask_app.app_context():
+                _producer()
+
+        t = Thread(target=thread_wrapper, daemon=True)
         t.start()
+
 
         @stream_with_context
         def event_stream():
