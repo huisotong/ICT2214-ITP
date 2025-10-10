@@ -73,7 +73,7 @@ def internet_search_results(query, num_results=5):
                 results.append(f"{title}: {snippet}")
         return "\n".join(results)
     except Exception as e:
-        print(f"❌ Internet search failed: {e}")
+        print(f"Internet search failed: {e}")
         return ""
 
 # Function to extract text
@@ -172,14 +172,14 @@ def tag_document_to_qdrant(module_id: str, file_content: str, filename: str):
         )
 
     # Step 6: Add documents to the vector store
-    print(f"📤 Uploading {len(documents)} documents to Qdrant...")
+    print(f"Uploading {len(documents)} documents to Qdrant...")
     vectorstore = QdrantVectorStore(
         client=client,
         collection_name=collection_name,
         embedding=embeddings
     )
     vectorstore.add_documents(documents)
-    print("✅ Tagging completed successfully.")
+    print("Tagging completed successfully.")
 
     # Step 7: Return list of filenames tagged (same repeated filename for each chunk)
     return [str(doc.metadata["filename"]) for doc in documents]
@@ -190,7 +190,7 @@ def untag_document_from_qdrant(module_id: str, filename: str):
     client = get_qdrant_client()
     collection_name = f"module_{module_id}"
 
-    print(f"🧹 Removing all points for file '{filename}' from collection '{collection_name}'...")
+    print(f"Removing all points for file '{filename}' from collection '{collection_name}'...")
 
     try:
         # Step 1: Retrieve all vectors and their payloads from the specified collection
@@ -200,7 +200,7 @@ def untag_document_from_qdrant(module_id: str, filename: str):
             limit=1000  # May increase if you expect very large files
         )
     except Exception as e:
-        print(f"❌ Failed to scroll Qdrant collection: {e}")
+        print(f"Failed to scroll Qdrant collection: {e}")
         return
 
     all_docs = scroll_result[0]
@@ -212,10 +212,10 @@ def untag_document_from_qdrant(module_id: str, filename: str):
         filename_nested = doc.payload.get("metadata", {}).get("filename")
 
         if filename_flat == filename:
-            print(f"✅ Matched flat filename: {filename_flat}")
+            print(f"Matched flat filename: {filename_flat}")
             matching_ids.append(str(doc.id))
         elif filename_nested == filename:
-            print(f"✅ Matched nested filename: {filename_nested}")
+            print(f"Matched nested filename: {filename_nested}")
             matching_ids.append(str(doc.id))
 
     if not matching_ids:
@@ -228,7 +228,7 @@ def untag_document_from_qdrant(module_id: str, filename: str):
         points_selector=PointIdsList(points=matching_ids)
     )
 
-    print(f"🗑️ Deleted {len(matching_ids)} points. Qdrant response:", result)
+    print(f"Deleted {len(matching_ids)} points. Qdrant response:", result)
 
 
 @chatbot_bp.route('/get-model-settings/<module_id>', methods=['GET'])
@@ -256,9 +256,9 @@ def get_model_settings(module_id):
                     name = name.strip()
                     if name not in filenames:
                         filenames.append(name)
-                    print(f"✅ Found filename: {name}")
+                    print(f"Found filename: {name}")
                 else:
-                    print(f"⚠️ Skipped point without filename. Point ID: {doc.id}")
+                    print(f"Skipped point without filename. Point ID: {doc.id}")
 
 
         except Exception as e:
@@ -315,14 +315,14 @@ def save_model_settings():
 @chatbot_bp.route('/tag-document', methods=['POST'])
 def tag_document():
     try:
-        print("📥 Received request to /tag-document")
+        print("Received request to /tag-document")
         module_id = request.form.get("moduleID")
         file = request.files.get("file")
 
         if not module_id or not file:
             return jsonify({"error": "Missing moduleID or file"}), 400
 
-        # 🔍 Extract text from any supported file
+        # Extract text from any supported file
         content = extract_text_from_file(file)
 
         if not content.strip():
@@ -339,7 +339,7 @@ def tag_document():
         }), 200
 
     except Exception as e:
-        print("❌ EXCEPTION in /tag-document route:")
+        print("EXCEPTION in /tag-document route:")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
     
@@ -348,7 +348,7 @@ def tag_document():
 @chatbot_bp.route('/untag-document', methods=['POST'])
 def untag_document():
     try:
-        print("📥 Received request to /untag-document")
+        print("Received request to /untag-document")
         data = request.get_json()
         module_id = data.get("moduleID")
         filename = data.get("docID")  # Must match the filename stored in metadata
@@ -362,7 +362,7 @@ def untag_document():
         return jsonify({"status": "success"}), 200
 
     except Exception as e:
-        print("❌ EXCEPTION in /untag-document route:", str(e))
+        print("EXCEPTION in /untag-document route:", str(e))
         return jsonify({"error": str(e)}), 500
 
 
@@ -586,7 +586,7 @@ def send_message():
 
                         # 2) If no retrieved docs AND internet_search is False => immediately respond "outside scope"
                         if not retrieved_docs and not search_context:
-                            print("⚠️ No docs found, sending outside-scope message.")
+                            print("No docs found, sending outside-scope message.")
                             outside_msg = "I'm sorry — this topic is outside this module's scope. Please enable Internet Search for an open-web answer."
                             # push one 'token' event first so frontend displays text
                             q.put({"type": "token", "data": outside_msg})
@@ -648,7 +648,7 @@ def send_message():
                     usage["completion"] = cb_usage.completion_tokens or 0
 
             except Exception as e:
-                print("❌ Exception inside _producer:", e)
+                print("Exception inside _producer:", e)
                 q.put({"type": "error", "message": str(e)})
             finally:
                 q.put({"type": "end"})
