@@ -83,7 +83,7 @@ def provision_sandbox():
         # Check if account creation was initiated successfully
         if state == 'IN_PROGRESS':
             # Poll for account creation completion (with timeout)
-            max_attempts = 30  # 30 attempts * 2 seconds = 60 seconds timeout
+            max_attempts = 300  # 300 attempts * 2 seconds = 600 seconds timeout
             attempt = 0
             
             while attempt < max_attempts:
