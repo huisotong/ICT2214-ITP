@@ -21,3 +21,4 @@ uuid>=1.30
 openpyxl
 pdfplumber
 python-pptx
+boto3>=1.35.0

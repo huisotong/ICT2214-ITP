@@ -8,3 +8,4 @@ class Student(db.Model):
     fullName = db.Column(db.String(255), nullable=False)
     email = db.Column(db.String(255), nullable=False)
     mobileNumber = db.Column(db.String(20), nullable=True)
+    awsAccountId = db.Column(db.String(255), nullable=True)
