@@ -9,3 +9,5 @@ class Student(db.Model):
     email = db.Column(db.String(255), nullable=False)
     mobileNumber = db.Column(db.String(20), nullable=True)
     awsAccountId = db.Column(db.String(255), nullable=True)
+    sagemakerDomainId = db.Column(db.String(255), nullable=True)
+    sagemakerUserProfileName = db.Column(db.String(255), nullable=True)
