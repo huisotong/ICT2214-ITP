@@ -25,10 +25,10 @@ export default function RequestCreditsPage({ setModal }) {
         setModules(data || []);
       } catch (error) {
         console.error("Error fetching user modules:", error);
-        setModal?.({ 
-          active: true, 
-          type: "fail", 
-          message: "Failed to load your modules. Please try again." 
+        setModal?.({
+          active: true,
+          type: "fail",
+          message: "Failed to load your modules. Please try again.",
         });
       } finally {
         setFetchingModules(false);
@@ -45,12 +45,14 @@ export default function RequestCreditsPage({ setModal }) {
     async function fetchUserRequests() {
       setFetchingRequests(true);
       try {
-        const response = await fetch("http://localhost:5000/api/credit-requests");
+        const response = await fetch(
+          "http://localhost:5000/api/credit-requests"
+        );
         if (response.ok) {
           const allRequests = await response.json();
           // Filter requests for current user by matching userID through assignmentID
-          const userModuleAssignments = modules.map(m => m.assignmentID);
-          const filteredRequests = allRequests.filter(req => 
+          const userModuleAssignments = modules.map((m) => m.assignmentID);
+          const filteredRequests = allRequests.filter((req) =>
             userModuleAssignments.includes(req.assignmentID)
           );
           setUserRequests(filteredRequests);
@@ -76,37 +78,41 @@ export default function RequestCreditsPage({ setModal }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!selectedModuleAssignment || !creditsRequested) {
-      setModal?.({ 
-        active: true, 
-        type: "fail", 
-        message: "Please select a module and enter the number of credits requested." 
+      setModal?.({
+        active: true,
+        type: "fail",
+        message:
+          "Please select a module and enter the number of credits requested.",
       });
       return;
     }
 
     const credits = parseInt(creditsRequested);
     if (credits <= 0) {
-      setModal?.({ 
-        active: true, 
-        type: "fail", 
-        message: "Credits requested must be a positive number." 
+      setModal?.({
+        active: true,
+        type: "fail",
+        message: "Credits requested must be a positive number.",
       });
       return;
     }
 
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:5000/api/credit-requests", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          assignmentID: selectedModuleAssignment,
-          creditsRequested: credits,
-        }),
-      });
+      const response = await fetch(
+        "http://localhost:5000/api/credit-requests",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            assignmentID: selectedModuleAssignment,
+            creditsRequested: credits,
+          }),
+        }
+      );
 
       const data = await response.json();
 
@@ -114,23 +120,25 @@ export default function RequestCreditsPage({ setModal }) {
         throw new Error(data.error || "Failed to submit credit request");
       }
 
-      setModal?.({ 
-        active: true, 
-        type: "success", 
-        message: "Credit request submitted successfully!" 
+      setModal?.({
+        active: true,
+        type: "success",
+        message: "Credit request submitted successfully!",
       });
-      
+
       // Reset form
       setSelectedModuleAssignment("");
       setCreditsRequested("");
-      
+
       // Refresh user requests
-      const userModuleAssignments = modules.map(m => m.assignmentID);
+      const userModuleAssignments = modules.map((m) => m.assignmentID);
       try {
-        const response = await fetch("http://localhost:5000/api/credit-requests");
+        const response = await fetch(
+          "http://localhost:5000/api/credit-requests"
+        );
         if (response.ok) {
           const allRequests = await response.json();
-          const filteredRequests = allRequests.filter(req => 
+          const filteredRequests = allRequests.filter((req) =>
             userModuleAssignments.includes(req.assignmentID)
           );
           setUserRequests(filteredRequests);
@@ -138,12 +146,11 @@ export default function RequestCreditsPage({ setModal }) {
       } catch (error) {
         console.error("Error refreshing requests:", error);
       }
-      
     } catch (error) {
-      setModal?.({ 
-        active: true, 
-        type: "fail", 
-        message: error.message 
+      setModal?.({
+        active: true,
+        type: "fail",
+        message: error.message,
       });
     } finally {
       setLoading(false);
@@ -151,15 +158,22 @@ export default function RequestCreditsPage({ setModal }) {
   };
 
   const handleDeleteRequest = async (requestID) => {
-    if (!window.confirm("Are you sure you want to delete this credit request? This action cannot be undone.")) {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this credit request? This action cannot be undone."
+      )
+    ) {
       return;
     }
 
     try {
-      const response = await fetch(`http://localhost:5000/api/credit-requests/${requestID}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
+      const response = await fetch(
+        `http://localhost:5000/api/credit-requests/${requestID}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+        }
+      );
 
       const data = await response.json();
 
@@ -167,19 +181,21 @@ export default function RequestCreditsPage({ setModal }) {
         throw new Error(data.error || "Failed to delete credit request");
       }
 
-      setModal?.({ 
-        active: true, 
-        type: "success", 
-        message: "Credit request deleted successfully!" 
+      setModal?.({
+        active: true,
+        type: "success",
+        message: "Credit request deleted successfully!",
       });
-      
+
       // Refresh user requests
-      const userModuleAssignments = modules.map(m => m.assignmentID);
+      const userModuleAssignments = modules.map((m) => m.assignmentID);
       try {
-        const refreshResponse = await fetch("http://localhost:5000/api/credit-requests");
+        const refreshResponse = await fetch(
+          "http://localhost:5000/api/credit-requests"
+        );
         if (refreshResponse.ok) {
           const allRequests = await refreshResponse.json();
-          const filteredRequests = allRequests.filter(req => 
+          const filteredRequests = allRequests.filter((req) =>
             userModuleAssignments.includes(req.assignmentID)
           );
           setUserRequests(filteredRequests);
@@ -187,12 +203,11 @@ export default function RequestCreditsPage({ setModal }) {
       } catch (error) {
         console.error("Error refreshing requests:", error);
       }
-      
     } catch (error) {
-      setModal?.({ 
-        active: true, 
-        type: "fail", 
-        message: error.message 
+      setModal?.({
+        active: true,
+        type: "fail",
+        message: error.message,
       });
     }
   };
@@ -202,45 +217,77 @@ export default function RequestCreditsPage({ setModal }) {
       {/* Existing Requests Section */}
       {userRequests.length > 0 && (
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">Your Credit Requests</h2>
+          <h2 className="text-xl font-bold text-gray-800 mb-4">
+            Your Credit Requests
+          </h2>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse border border-gray-300">
               <thead>
                 <tr className="bg-gray-50">
-                  <th className="border border-gray-300 px-4 py-2 text-left">Request ID</th>
-                  <th className="border border-gray-300 px-4 py-2 text-left">Module</th>
-                  <th className="border border-gray-300 px-4 py-2 text-left">Credits Requested</th>
-                  <th className="border border-gray-300 px-4 py-2 text-left">Status</th>
-                  <th className="border border-gray-300 px-4 py-2 text-left">Request Date</th>
-                  <th className="border border-gray-300 px-4 py-2 text-left">Actions</th>
+                  <th className="border border-gray-300 px-4 py-2 text-left">
+                    Request ID
+                  </th>
+                  <th className="border border-gray-300 px-4 py-2 text-left">
+                    Module
+                  </th>
+                  <th className="border border-gray-300 px-4 py-2 text-left">
+                    Credits Requested
+                  </th>
+                  <th className="border border-gray-300 px-4 py-2 text-left">
+                    Status
+                  </th>
+                  <th className="border border-gray-300 px-4 py-2 text-left">
+                    Request Date
+                  </th>
+                  <th className="border border-gray-300 px-4 py-2 text-left">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {userRequests.map((request) => {
-                  const module = modules.find(m => m.assignmentID === request.assignmentID);
+                  const module = modules.find(
+                    (m) => m.assignmentID === request.assignmentID
+                  );
                   return (
                     <tr key={request.requestID} className="hover:bg-gray-50">
-                      <td className="border border-gray-300 px-4 py-2">{request.requestID}</td>
                       <td className="border border-gray-300 px-4 py-2">
-                        {module ? `${module.moduleID} - ${module.moduleName}` : 'Unknown Module'}
+                        {request.requestID}
                       </td>
-                      <td className="border border-gray-300 px-4 py-2">{request.creditsRequested}</td>
                       <td className="border border-gray-300 px-4 py-2">
-                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                          request.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
-                          request.status === 'Approved' ? 'bg-green-100 text-green-800' :
-                          request.status === 'Rejected' ? 'bg-red-100 text-red-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
+                        {module
+                          ? `${module.moduleID} - ${module.moduleName}`
+                          : "Unknown Module"}
+                      </td>
+                      <td className="border border-gray-300 px-4 py-2">
+                        {request.creditsRequested}
+                      </td>
+                      <td className="border border-gray-300 px-4 py-2">
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                            request.status === "Pending"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : request.status === "Approved"
+                              ? "bg-green-100 text-green-800"
+                              : request.status === "Rejected"
+                              ? "bg-red-100 text-red-800"
+                              : "bg-gray-100 text-gray-800"
+                          }`}
+                        >
                           {request.status}
                         </span>
                       </td>
                       <td className="border border-gray-300 px-4 py-2">
-                        {request.requestDate ? new Date(request.requestDate).toLocaleDateString() : 'N/A'}
-                      </td>                      <td className="border border-gray-300 px-4 py-2">
-                        {request.status === 'Pending' ? (
+                        {request.requestDate
+                          ? new Date(request.requestDate).toLocaleDateString()
+                          : "N/A"}
+                      </td>
+                      <td className="border border-gray-300 px-4 py-2">
+                        {request.status === "Pending" ? (
                           <button
-                            onClick={() => handleDeleteRequest(request.requestID)}
+                            onClick={() =>
+                              handleDeleteRequest(request.requestID)
+                            }
                             className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm font-semibold transition-colors"
                             title="Delete this pending request"
                           >
@@ -261,11 +308,14 @@ export default function RequestCreditsPage({ setModal }) {
 
       {/* Submit New Request Section */}
       <div className="bg-white rounded-lg shadow-md p-8">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6">Request Credits</h1>
-          <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-400 rounded">
+        <h1 className="text-2xl font-bold text-gray-800 mb-6">
+          Request Credits
+        </h1>
+        <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-400 rounded">
           <p className="text-blue-800">
-            <strong>Note:</strong> Credit requests are reviewed by administrators. 
-            You can only have one pending request per module at a time. You can delete pending requests if you change your mind.
+            <strong>Note:</strong> Credit requests are reviewed by
+            administrators. You can only have one pending request per module at
+            a time. You can delete pending requests if you change your mind.
           </p>
         </div>
 
@@ -276,12 +326,17 @@ export default function RequestCreditsPage({ setModal }) {
           </div>
         ) : modules.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-gray-600">You are not enrolled in any modules yet.</p>
+            <p className="text-gray-600">
+              You are not enrolled in any modules yet.
+            </p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="module" className="block text-sm font-semibold text-gray-700 mb-2">
+              <label
+                htmlFor="module"
+                className="block text-sm font-semibold text-gray-700 mb-2"
+              >
                 Select Module *
               </label>
               <select
@@ -295,14 +350,18 @@ export default function RequestCreditsPage({ setModal }) {
                 {modules.map((module) => (
                   <option key={module.assignmentID} value={module.assignmentID}>
                     {`${module.moduleID} - ${module.moduleName}`}
-                    {module.studentCredits !== undefined && ` (Current Credits: ${module.studentCredits} USD) `}
+                    {module.studentCredits !== undefined &&
+                      ` (Current Credits: ${module.studentCredits} USD) `}
                   </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label htmlFor="credits" className="block text-sm font-semibold text-gray-700 mb-2">
+              <label
+                htmlFor="credits"
+                className="block text-sm font-semibold text-gray-700 mb-2"
+              >
                 Credits Requested (In USD) *
               </label>
               <input
@@ -317,7 +376,8 @@ export default function RequestCreditsPage({ setModal }) {
                 required
               />
               <p className="mt-1 text-sm text-gray-500">
-                Enter the number of additional credits you would like to request.
+                Enter the number of additional credits you would like to
+                request.
               </p>
             </div>
 

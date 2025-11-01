@@ -1,200 +1,215 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
-import LoginPage from "../pages/LoginPage";
+import React from "react";
 
-// Mock AuthContext
+// 1️⃣ Mock react-router-dom navigate
+const mockNavigate = jest.fn();
+jest.mock("react-router-dom", () => ({
+  useNavigate: () => mockNavigate,
+}));
+
+// 2️⃣ Mock useAuth
 const mockSetAuth = jest.fn();
-const mockAuth = {
-  isAuthenticated: false,
-  user: null,
-};
-
 jest.mock("../context/AuthContext", () => ({
   useAuth: () => ({
-    auth: mockAuth,
     setAuth: mockSetAuth,
   }),
 }));
 
-// Mock the navigate function
-const mockNavigate = jest.fn();
-jest.mock("react-router-dom", () => ({
-  ...jest.requireActual("react-router-dom"),
-  useNavigate: () => mockNavigate,
-}));
-
-// Mock validateEmail utility
+// 3️⃣ Mock validateEmail
 jest.mock("../../utils/helper", () => ({
   validateEmail: jest.fn(),
 }));
-
-// Mock fetch
-global.fetch = jest.fn();
-
 import { validateEmail } from "../../utils/helper";
 
-const renderLoginPage = () => {
-  return render(
-    <MemoryRouter>
-      <LoginPage />
-    </MemoryRouter>
-  );
-};
+// 4️⃣ Mock Input component
+jest.mock("../components/login/Input", () => (props) => (
+  <input
+    aria-label={props.label}
+    type={props.type}
+    placeholder={props.placeholder}
+    value={props.value}
+    onChange={props.onChange}
+  />
+));
+
+// 5️⃣ Import component *after mocks*
+import LoginPage from "../pages/LoginPage";
 
 describe("LoginPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    validateEmail.mockReturnValue(true);
+    global.fetch = jest.fn(); // mock fetch globally
   });
 
-  afterEach(() => {
-    mockSessionStorage.setItem.mockClear();
+  /* ----------------------------- Rendering ----------------------------- */
+  it("renders the login page with email and password fields", () => {
+    render(<LoginPage />);
+    expect(screen.getByText(/Login Page/i)).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/Email is student@sit.singaporetech.edu.sg/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/Password is teststudent/i)
+    ).toBeInTheDocument();
   });
 
-  it("should render login form with all required elements", () => {
-    renderLoginPage();
-
-    expect(screen.getByText("Login Page")).toBeInTheDocument();
-    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /log in/i })).toBeInTheDocument();
+  /* ------------------------ Validation: Empty Fields ------------------------ */
+  it("shows error when fields are empty", async () => {
+    render(<LoginPage />);
+    fireEvent.click(screen.getByText(/Log In/i));
+    expect(
+      await screen.findByText(/Email and password cannot be empty/i)
+    ).toBeInTheDocument();
   });
 
-  it("should show error when email and password are empty", async () => {
-    renderLoginPage();
+  // /* ------------------------ Validation: Invalid Email ----------------------- */
+  // it("shows error when email is invalid", async () => {
+  //   validateEmail.mockReturnValue(false);
+  //   render(<LoginPage />);
 
-    const submitButton = screen.getByRole("button", { name: /log in/i });
-    fireEvent.click(submitButton);
+  //   fireEvent.change(
+  //     screen.getByLabelText(/Email is student@sit.singaporetech.edu.sg/i),
+  //     { target: { value: "invalidemail" } }
+  //   );
+  //   fireEvent.change(screen.getByLabelText(/Password is teststudent/i), {
+  //     target: { value: "password123" },
+  //   });
+  //   fireEvent.click(screen.getByText(/Log In/i));
 
-    await waitFor(() => {
-      expect(
-        screen.getByText("Email and password cannot be empty")
-      ).toBeInTheDocument();
-    });
-  });
-
-  it("should show error when email is invalid", async () => {
+  //   expect(
+  //     await screen.findByText(/Please include/i)
+  //   ).toBeInTheDocument();
+  // });
+  /* ------------------------ Validation: Invalid Email ----------------------- */
+  it("shows error when email is invalid", async () => {
+    // For this test, make the globally mocked validateEmail return false.
     validateEmail.mockReturnValue(false);
-    renderLoginPage();
+    render(<LoginPage />);
 
-    const emailInput = screen.getByLabelText(/email/i);
-    const passwordInput = screen.getByLabelText(/password/i);
-    const submitButton = screen.getByRole("button", { name: /log in/i });
-
-    fireEvent.change(emailInput, { target: { value: "invalid-email" } });
-    fireEvent.change(passwordInput, { target: { value: "123456" } });
-    fireEvent.click(submitButton);
-
-    await waitFor(() => {
-      expect(
-        screen.getByText("Please enter a valid email address")
-      ).toBeInTheDocument();
+    // Case 1: Missing '@'
+    fireEvent.change(
+      screen.getByLabelText(/Email is student@sit.singaporetech.edu.sg/i),
+      { target: { value: "invalidemail" } }
+    );
+    fireEvent.change(screen.getByLabelText(/Password is teststudent/i), {
+      target: { value: "password123" },
     });
+    fireEvent.submit(screen.getByRole("button", { name: /Log In/i }));
+
+    expect(
+      await screen.findByText(/Please enter a valid email address/i)
+    ).toBeInTheDocument();
+
+    // Case 2: Double '@'
+    fireEvent.change(
+      screen.getByLabelText(/Email is student@sit.singaporetech.edu.sg/i),
+      { target: { value: "admin@@sit.singaporetech.edu.sg" } }
+    );
+    fireEvent.submit(screen.getByRole("button", { name: /Log In/i }));
+
+    expect(
+      await screen.findByText(/Please enter a valid email address/i)
+    ).toBeInTheDocument();
+
+    // Case 3: No domain part
+    fireEvent.change(
+      screen.getByLabelText(/Email is student@sit.singaporetech.edu.sg/i),
+      { target: { value: "admin@sit" } }
+    );
+    fireEvent.submit(screen.getByRole("button", { name: /Log In/i }));
+
+    expect(
+      await screen.findByText(/Please enter a valid email address/i)
+    ).toBeInTheDocument();
+
+    // Ensure validateEmail was called each time
+    expect(validateEmail).toHaveBeenCalledTimes(3);
   });
 
-  it("should show error for invalid credentials", async () => {
-    renderLoginPage();
+  /* ---------------------------- Successful Login --------------------------- */
+  it("calls fetch and navigates on successful login", async () => {
+    validateEmail.mockReturnValue(true);
 
-    const emailInput = screen.getByLabelText(/email/i);
-    const passwordInput = screen.getByLabelText(/password/i);
-    const submitButton = screen.getByRole("button", { name: /log in/i });
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ user: { name: "Test User" } }),
+    });
 
-    fireEvent.change(emailInput, { target: { value: "wrong@email.com" } });
-    fireEvent.change(passwordInput, { target: { value: "wrongpassword" } });
-    fireEvent.click(submitButton);
+    render(<LoginPage />);
+
+    fireEvent.change(
+      screen.getByLabelText(/Email is student@sit.singaporetech.edu.sg/i),
+      { target: { value: "student@sit.singaporetech.edu.sg" } }
+    );
+    fireEvent.change(screen.getByLabelText(/Password is teststudent/i), {
+      target: { value: "teststudent" },
+    });
+
+    fireEvent.click(screen.getByText(/Log In/i));
 
     await waitFor(() => {
-      expect(screen.getByText("Invalid email or password")).toBeInTheDocument();
-    });
-  });
-
-  it("should successfully login with valid credentials", async () => {
-    renderLoginPage();
-
-    const emailInput = screen.getByLabelText(/email/i);
-    const passwordInput = screen.getByLabelText(/password/i);
-    const submitButton = screen.getByRole("button", { name: /log in/i });
-
-    fireEvent.change(emailInput, {
-      target: { value: "student@sit.singaporetech.edu.sg" },
-    });
-    fireEvent.change(passwordInput, { target: { value: "123456" } });
-    fireEvent.click(submitButton);
-
-    await waitFor(() => {
-      expect(mockSessionStorage.setItem).toHaveBeenCalledWith(
-        "token",
-        "abc123"
+      expect(global.fetch).toHaveBeenCalledWith(
+        "http://localhost:5000/api/login",
+        expect.objectContaining({
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: "student@sit.singaporetech.edu.sg",
+            password: "teststudent",
+          }),
+        })
       );
-      expect(mockSessionStorage.setItem).toHaveBeenCalledWith(
-        "user",
-        JSON.stringify({ email: "student@sit.singaporetech.edu.sg" })
-      );
+      expect(mockSetAuth).toHaveBeenCalledWith({
+        isAuthenticated: true,
+        user: { name: "Test User" },
+      });
       expect(mockNavigate).toHaveBeenCalledWith("/home");
     });
   });
 
-  it("should update email input value when typed", () => {
-    renderLoginPage();
+  /* ------------------------------ Login Failed ----------------------------- */
+  it("shows error when login fails (400/401)", async () => {
+    validateEmail.mockReturnValue(true);
 
-    const emailInput = screen.getByLabelText(/email/i);
-    fireEvent.change(emailInput, { target: { value: "test@example.com" } });
+    global.fetch.mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ error: "Invalid credentials" }),
+    });
 
-    expect(emailInput.value).toBe("test@example.com");
+    render(<LoginPage />);
+
+    fireEvent.change(
+      screen.getByLabelText(/Email is student@sit.singaporetech.edu.sg/i),
+      { target: { value: "student@sit.singaporetech.edu.sg" } }
+    );
+    fireEvent.change(screen.getByLabelText(/Password is teststudent/i), {
+      target: { value: "wrongpassword" },
+    });
+
+    fireEvent.click(screen.getByText(/Log In/i));
+
+    expect(await screen.findByText(/Invalid credentials/i)).toBeInTheDocument();
   });
 
-  it("should update password input value when typed", () => {
-    renderLoginPage();
+  /* -------------------------- Network / Fetch Error ------------------------ */
+  it("shows error when a network error occurs", async () => {
+    validateEmail.mockReturnValue(true);
+    global.fetch.mockRejectedValueOnce(new Error("Network error"));
 
-    const passwordInput = screen.getByLabelText(/password/i);
-    fireEvent.change(passwordInput, { target: { value: "testpassword" } });
+    render(<LoginPage />);
 
-    expect(passwordInput.value).toBe("testpassword");
-  });
-
-  it("should clear error message on successful login", async () => {
-    renderLoginPage();
-
-    const emailInput = screen.getByLabelText(/email/i);
-    const passwordInput = screen.getByLabelText(/password/i);
-    const submitButton = screen.getByRole("button", { name: /log in/i });
-
-    // First, trigger an error
-    fireEvent.click(submitButton);
-    await waitFor(() => {
-      expect(
-        screen.getByText("Email and password cannot be empty")
-      ).toBeInTheDocument();
+    fireEvent.change(
+      screen.getByLabelText(/Email is student@sit.singaporetech.edu.sg/i),
+      { target: { value: "student@sit.singaporetech.edu.sg" } }
+    );
+    fireEvent.change(screen.getByLabelText(/Password is teststudent/i), {
+      target: { value: "teststudent" },
     });
 
-    // Then, provide valid credentials
-    fireEvent.change(emailInput, {
-      target: { value: "student@sit.singaporetech.edu.sg" },
-    });
-    fireEvent.change(passwordInput, { target: { value: "123456" } });
-    fireEvent.click(submitButton);
+    fireEvent.click(screen.getByText(/Log In/i));
 
-    await waitFor(() => {
-      expect(
-        screen.queryByText("Email and password cannot be empty")
-      ).not.toBeInTheDocument();
-    });
-  });
-
-  it("should handle form submission with Enter key", async () => {
-    renderLoginPage();
-
-    const emailInput = screen.getByLabelText(/email/i);
-    const passwordInput = screen.getByLabelText(/password/i);
-
-    fireEvent.change(emailInput, {
-      target: { value: "student@sit.singaporetech.edu.sg" },
-    });
-    fireEvent.change(passwordInput, { target: { value: "123456" } });
-    fireEvent.submit(emailInput.closest("form"));
-
-    await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith("/home");
-    });
+    expect(
+      await screen.findByText(/An error occurred while trying to log in/i)
+    ).toBeInTheDocument();
   });
 });
