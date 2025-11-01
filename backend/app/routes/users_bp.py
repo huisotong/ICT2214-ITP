@@ -59,6 +59,14 @@ def login():
     # ✅ Generate JWT token valid for 1 day
     access_token = create_access_token(identity=str(user.userID), expires_delta=timedelta(days=1))
 
+    # Get student record to include awsAccountId if user is a student
+    aws_account_id = None
+    if user.studentID:
+        from app.models.students import Student
+        student = Student.query.get(user.studentID)
+        if student:
+            aws_account_id = student.awsAccountId
+    
     # ✅ Create response with secure cookie
     response = make_response(jsonify({
         "message": "Login successful",
@@ -68,7 +76,8 @@ def login():
             "email": user.email,
             "mobileNumber": user.mobileNumber,
             "role": user.role,
-            "studentID": user.studentID
+            "studentID": user.studentID,
+            "awsAccountId": aws_account_id
         }
     }))
     print("✅ Login cookie set")
@@ -92,13 +101,22 @@ def me():
     if not user:
         return jsonify({'error': 'User not found'}), 404
 
+    # Get student record to include awsAccountId if user is a student
+    aws_account_id = None
+    if user.studentID:
+        from app.models.students import Student
+        student = Student.query.get(user.studentID)
+        if student:
+            aws_account_id = student.awsAccountId
+
     return jsonify({
         "userID": user.userID,
         "name": user.name,
         "email": user.email,
         "mobileNumber": user.mobileNumber,
         "role": user.role,
-        "studentID": user.studentID
+        "studentID": user.studentID,
+        "awsAccountId": aws_account_id
     }), 200
 
 # 4. Update user details

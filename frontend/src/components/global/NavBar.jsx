@@ -17,6 +17,8 @@ export default function NavBar() {
 
   const [open, setOpen] = useState(false);
   const [provisioningLoading, setProvisioningLoading] = useState(false);
+  const [setupLoading, setSetupLoading] = useState(false);
+  const [sagemakerLoading, setSagemakerLoading] = useState(false);
   const dropdownRef = useRef(null);
 
   // Close dropdown when clicking outside
@@ -80,6 +82,117 @@ export default function NavBar() {
       alert("❌ Network Error\n\nFailed to connect to the server. Please check your connection and try again.");
     } finally {
       setProvisioningLoading(false);
+    }
+  };
+
+  // Setup SageMaker Sandbox handler (triggers Lambda)
+  const handleSetupSageMaker = async () => {
+    if (setupLoading) return; // Prevent double-clicks
+
+    setSetupLoading(true);
+    setOpen(false); // Close dropdown
+
+    try {
+      const response = await fetch("http://localhost:5000/api/setup-sandbox", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Setup started successfully
+        alert(`🚀 SageMaker Setup Started!\n\n${data.message}\n\nYou'll be able to access your SageMaker environment once setup completes.`);
+      } else {
+        // Error from backend
+        alert(`❌ Setup Failed\n\n${data.error || "An error occurred while setting up your SageMaker environment."}\n\nPlease contact support if this issue persists.`);
+      }
+    } catch (error) {
+      console.error("SageMaker setup error:", error);
+      alert("❌ Network Error\n\nFailed to connect to the server. Please check your connection and try again.");
+    } finally {
+      setSetupLoading(false);
+    }
+  };
+
+  // Access SageMaker Sandbox handler
+  const handleAccessSageMaker = async () => {
+    if (sagemakerLoading) return; // Prevent double-clicks
+
+    setSagemakerLoading(true);
+    setOpen(false); // Close dropdown
+
+    try {
+      const response = await fetch("http://localhost:5000/api/sagemaker-login-url", {
+        method: "GET",
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // DEBUG: Show debug info before redirecting
+        if (data.debug) {
+          const debugInfo = `🐛 DEBUG INFO:\n\n` +
+            `AWS Account ID: ${data.debug.awsAccountId}\n` +
+            `Student ID: ${data.debug.studentID}\n` +
+            `User Profile Name: ${data.debug.userProfileName}\n` +
+            `Region: ${data.debug.region}\n` +
+            `Role ARN: ${data.debug.roleArn}\n` +
+            `Domains Found: ${data.debug.domainsFound}\n` +
+            `Domains: ${JSON.stringify(data.debug.domainsList, null, 2)}\n` +
+            `Selected Domain ID: ${data.debug.selectedDomainId}\n` +
+            `User Profiles Found: ${data.debug.userProfilesFound || 'N/A'}\n` +
+            `User Profiles: ${JSON.stringify(data.debug.userProfilesList || [], null, 2)}\n\n` +
+            `Click OK to redirect to SageMaker Studio...`;
+          
+          alert(debugInfo);
+        }
+        
+        // Redirect to SageMaker Studio
+        window.location.href = data.loginUrl;
+      } else if (response.status === 404) {
+        // SageMaker environment still being provisioned
+        let errorMsg = `⏳ Sandbox Still Provisioning\n\n${data.error}\n\nYour SageMaker environment is being set up. This usually takes a few minutes after account creation.`;
+        
+        // Add debug info if available
+        if (data.debug) {
+          errorMsg += `\n\n🐛 DEBUG INFO:\n` +
+            `AWS Account ID: ${data.debug.awsAccountId}\n` +
+            `Student ID: ${data.debug.studentID}\n` +
+            `User Profile Name: ${data.debug.userProfileName}\n` +
+            `Region: ${data.debug.region}\n` +
+            `Domains Found: ${data.debug.domainsFound}\n` +
+            `Domains: ${JSON.stringify(data.debug.domainsList, null, 2)}`;
+        }
+        
+        alert(errorMsg);
+      } else {
+        // Other errors
+        let errorMsg = `❌ Access Failed\n\n${data.error || "Unable to access SageMaker Studio."}\n\nPlease contact support if this issue persists.`;
+        
+        // Add debug info if available
+        if (data.debug) {
+          errorMsg += `\n\n🐛 DEBUG INFO:\n` +
+            `AWS Account ID: ${data.debug.awsAccountId}\n` +
+            `Student ID: ${data.debug.studentID}\n` +
+            `User Profile Name: ${data.debug.userProfileName}\n` +
+            `Region: ${data.debug.region}\n` +
+            `Domains Found: ${data.debug.domainsFound}\n` +
+            `User Profiles Found: ${data.debug.userProfilesFound || 'N/A'}\n` +
+            `User Profiles: ${JSON.stringify(data.debug.userProfilesList || [], null, 2)}`;
+        }
+        
+        alert(errorMsg);
+      }
+    } catch (error) {
+      console.error("SageMaker access error:", error);
+      alert("❌ Network Error\n\nFailed to connect to the server. Please check your connection and try again.");
+    } finally {
+      setSagemakerLoading(false);
     }
   };
 
@@ -174,6 +287,32 @@ export default function NavBar() {
               >
                 <FaAws className="text-lg" />
                 {provisioningLoading ? "Provisioning..." : "Provision AWS Sandbox"}
+              </button>
+            )}
+            {/* Show Setup SageMaker button only for students with provisioned accounts */}
+            {user?.role !== "Admin" && user?.awsAccountId && (
+              <button
+                className={`flex items-center gap-2 px-4 py-2 w-full text-left hover:bg-gray-100 cursor-pointer ${
+                  setupLoading ? "opacity-50 cursor-wait" : ""
+                }`}
+                onClick={handleSetupSageMaker}
+                disabled={setupLoading}
+              >
+                <FaAws className="text-lg" />
+                {setupLoading ? "Setting up..." : "Setup SageMaker Sandbox"}
+              </button>
+            )}
+            {/* Show Access SageMaker button only for students with provisioned accounts */}
+            {user?.role !== "Admin" && user?.awsAccountId && (
+              <button
+                className={`flex items-center gap-2 px-4 py-2 w-full text-left hover:bg-gray-100 cursor-pointer ${
+                  sagemakerLoading ? "opacity-50 cursor-wait" : ""
+                }`}
+                onClick={handleAccessSageMaker}
+                disabled={sagemakerLoading}
+              >
+                <FaAws className="text-lg" />
+                {sagemakerLoading ? "Loading..." : "Access SageMaker Sandbox"}
               </button>
             )}
             <div className="border-t my-1" />
