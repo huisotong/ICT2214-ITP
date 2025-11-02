@@ -25,8 +25,8 @@ import requests
 from queue import Queue
 from threading import Thread
 import json
-from langchain.callbacks.base import BaseCallbackHandler
-from langchain.schema import HumanMessage
+from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.messages import HumanMessage
 from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI
 from langchain.chains import ConversationalRetrievalChain
@@ -34,7 +34,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.prompts import PromptTemplate
-from langchain.callbacks import get_openai_callback
+from langchain_community.callbacks.manager import get_openai_callback
 
 chatbot_bp = Blueprint('chatbot', __name__)
 UPLOAD_FOLDER = Path("uploads")
