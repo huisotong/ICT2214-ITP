@@ -41,7 +41,8 @@ from langchain_qdrant import QdrantVectorStore
 
 # Utilities that moved to langchain_community
 from langchain_community.callbacks.manager import get_openai_callback
-from langchain_community.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
 
 chatbot_bp = Blueprint('chatbot', __name__)
 UPLOAD_FOLDER = Path("uploads")
