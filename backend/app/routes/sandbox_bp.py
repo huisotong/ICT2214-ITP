@@ -301,6 +301,7 @@ def setup_sandbox():
     """
     Trigger Lambda function to setup SageMaker environment for authenticated student
     Returns:
+        - 200: SageMaker sandbox already set up
         - 202: Lambda invocation started successfully
         - 400: User is not a student or no AWS account provisioned
         - 500: Lambda invocation error
@@ -326,6 +327,14 @@ def setup_sandbox():
         # Check if student has an AWS account provisioned
         if not student.awsAccountId:
             return jsonify({'error': 'No AWS sandbox account found. Please provision an account first.'}), 400
+        
+        # IDEMPOTENCY CHECK: If SageMaker domain already exists, don't re-trigger Lambda
+        if student.sagemakerDomainId:
+            return jsonify({
+                'status': 'success',
+                'message': 'SageMaker sandbox is already set up',
+                'domainId': student.sagemakerDomainId
+            }), 200
         
         # Get student's transformed email (plus-addressed format)
         student_email_prefix = student.email.split('@')[0] if '@' in student.email else student.email
@@ -355,6 +364,7 @@ def setup_sandbox():
         
         # Invoke Lambda function asynchronously
         import json
+        import time
         response = lambda_client.invoke(
             FunctionName='SandboxProvisioningFunction',
             InvocationType='Event',  # Asynchronous invocation
@@ -363,14 +373,79 @@ def setup_sandbox():
         
         # Check if invocation was accepted
         status_code = response.get('StatusCode')
-        if status_code == 202:
-            return jsonify({
-                'message': 'Sandbox setup has been started. It may take up to 10 minutes.'
-            }), 202
-        else:
+        if status_code != 202:
             return jsonify({
                 'error': f'Lambda invocation returned unexpected status: {status_code}'
             }), 500
+        
+        # Lambda invoked successfully - now poll for domain creation
+        # Wait 15 seconds initially to give Lambda time to start provisioning
+        time.sleep(15)
+        
+        # Initialize STS client to assume role in student's account
+        sts_client = boto3.client(
+            'sts',
+            aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+            aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+            region_name='ap-southeast-2'
+        )
+        
+        # Assume role in student's child account
+        role_arn = f"arn:aws:iam::{student.awsAccountId}:role/OrganizationAccountAccessRole"
+        assumed_role = sts_client.assume_role(
+            RoleArn=role_arn,
+            RoleSessionName=f"sagemaker-setup-{student.studentID}"
+        )
+        
+        # Extract temporary credentials
+        credentials = assumed_role['Credentials']
+        
+        # Create SageMaker client with temporary credentials
+        sagemaker_client = boto3.client(
+            'sagemaker',
+            aws_access_key_id=credentials['AccessKeyId'],
+            aws_secret_access_key=credentials['SecretAccessKey'],
+            aws_session_token=credentials['SessionToken'],
+            region_name='ap-southeast-2'
+        )
+        
+        # Poll for domain creation (10 attempts, 12 seconds apart = 2 minutes total)
+        max_attempts = 10
+        for attempt in range(max_attempts):
+            try:
+                domains_response = sagemaker_client.list_domains()
+                domains = domains_response.get('Domains', [])
+                
+                if domains:
+                    # Domain found - store it in database
+                    domain_id = domains[0]['DomainId']
+                    student.sagemakerDomainId = domain_id
+                    db.session.commit()
+                    
+                    return jsonify({
+                        'status': 'success',
+                        'message': 'SageMaker sandbox setup completed successfully',
+                        'domainId': domain_id
+                    }), 200
+                
+                # No domain yet - wait before next attempt
+                if attempt < max_attempts - 1:  # Don't sleep on last attempt
+                    time.sleep(12)
+                    
+            except ClientError as poll_error:
+                # If we get an error polling, it might still be provisioning
+                if attempt < max_attempts - 1:
+                    time.sleep(12)
+                    continue
+                else:
+                    # Last attempt failed
+                    break
+        
+        # Polling completed but domain not found yet
+        return jsonify({
+            'status': 'in_progress',
+            'message': 'Sandbox setup is in progress. Please check back in a few minutes.'
+        }), 202
     
     except ClientError as e:
         error_code = e.response['Error']['Code']

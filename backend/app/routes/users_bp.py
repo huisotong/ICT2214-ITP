@@ -59,13 +59,15 @@ def login():
     # ✅ Generate JWT token valid for 1 day
     access_token = create_access_token(identity=str(user.userID), expires_delta=timedelta(days=1))
 
-    # Get student record to include awsAccountId if user is a student
+    # Get student record to include awsAccountId and sagemakerDomainId if user is a student
     aws_account_id = None
+    sagemaker_domain_id = None
     if user.studentID:
         from app.models.students import Student
         student = Student.query.get(user.studentID)
         if student:
             aws_account_id = student.awsAccountId
+            sagemaker_domain_id = student.sagemakerDomainId
     
     # ✅ Create response with secure cookie
     response = make_response(jsonify({
@@ -77,7 +79,8 @@ def login():
             "mobileNumber": user.mobileNumber,
             "role": user.role,
             "studentID": user.studentID,
-            "awsAccountId": aws_account_id
+            "awsAccountId": aws_account_id,
+            "sagemakerDomainId": sagemaker_domain_id
         }
     }))
     print("✅ Login cookie set")
@@ -101,13 +104,15 @@ def me():
     if not user:
         return jsonify({'error': 'User not found'}), 404
 
-    # Get student record to include awsAccountId if user is a student
+    # Get student record to include awsAccountId and sagemakerDomainId if user is a student
     aws_account_id = None
+    sagemaker_domain_id = None
     if user.studentID:
         from app.models.students import Student
         student = Student.query.get(user.studentID)
         if student:
             aws_account_id = student.awsAccountId
+            sagemaker_domain_id = student.sagemakerDomainId
 
     return jsonify({
         "userID": user.userID,
@@ -116,7 +121,8 @@ def me():
         "mobileNumber": user.mobileNumber,
         "role": user.role,
         "studentID": user.studentID,
-        "awsAccountId": aws_account_id
+        "awsAccountId": aws_account_id,
+        "sagemakerDomainId": sagemaker_domain_id
     }), 200
 
 # 4. Update user details

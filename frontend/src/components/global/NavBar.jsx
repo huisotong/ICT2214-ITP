@@ -69,9 +69,11 @@ export default function NavBar() {
         if (data.status === "existing") {
           // Account already exists
           alert(`✅ AWS Sandbox Account Already Exists\n\nAccount ID: ${data.awsAccountId}\n\nYou can use this account for your sandbox activities.`);
+          window.location.reload(); // Refresh to update button state
         } else if (data.status === "success") {
           // New account created
           alert(`🎉 AWS Sandbox Account Created Successfully!\n\nAccount ID: ${data.awsAccountId}\nAccount Name: ${data.accountName}\nEmail: ${data.email}\n\nYour sandbox environment is ready to use.`);
+          window.location.reload(); // Refresh to update button state
         }
       } else {
         // Error from backend
@@ -276,8 +278,8 @@ export default function NavBar() {
               <FaRegCreditCard className="text-lg" />
               Request for Credits
             </Link>
-            {/* Show Provision Sandbox button only for students (non-admins) */}
-            {user?.role !== "Admin" && (
+            {/* Show Provision Sandbox button only for students without AWS accounts */}
+            {user?.role !== "Admin" && !user?.awsAccountId && (
               <button
                 className={`flex items-center gap-2 px-4 py-2 w-full text-left hover:bg-gray-100 cursor-pointer ${
                   provisioningLoading ? "opacity-50 cursor-wait" : ""
@@ -289,8 +291,8 @@ export default function NavBar() {
                 {provisioningLoading ? "Provisioning..." : "Provision AWS Sandbox"}
               </button>
             )}
-            {/* Show Setup SageMaker button only for students with provisioned accounts */}
-            {user?.role !== "Admin" && user?.awsAccountId && (
+            {/* Show Setup SageMaker button only for students with AWS accounts but no SageMaker domain */}
+            {user?.role !== "Admin" && user?.awsAccountId && !user?.sagemakerDomainId && (
               <button
                 className={`flex items-center gap-2 px-4 py-2 w-full text-left hover:bg-gray-100 cursor-pointer ${
                   setupLoading ? "opacity-50 cursor-wait" : ""
@@ -302,8 +304,8 @@ export default function NavBar() {
                 {setupLoading ? "Setting up..." : "Setup SageMaker Sandbox"}
               </button>
             )}
-            {/* Show Access SageMaker button only for students with provisioned accounts */}
-            {user?.role !== "Admin" && user?.awsAccountId && (
+            {/* Show Access SageMaker button only for students with SageMaker domain set up */}
+            {user?.role !== "Admin" && user?.sagemakerDomainId && (
               <button
                 className={`flex items-center gap-2 px-4 py-2 w-full text-left hover:bg-gray-100 cursor-pointer ${
                   sagemakerLoading ? "opacity-50 cursor-wait" : ""
