@@ -138,17 +138,17 @@ export default function NavBar() {
       if (response.ok) {
         // DEBUG: Show debug info before redirecting
         if (data.debug) {
-          const debugInfo = `🐛 DEBUG INFO:\n\n` +
-            `AWS Account ID: ${data.debug.awsAccountId}\n` +
-            `Student ID: ${data.debug.studentID}\n` +
-            `User Profile Name: ${data.debug.userProfileName}\n` +
-            `Region: ${data.debug.region}\n` +
-            `Role ARN: ${data.debug.roleArn}\n` +
-            `Domains Found: ${data.debug.domainsFound}\n` +
-            `Domains: ${JSON.stringify(data.debug.domainsList, null, 2)}\n` +
-            `Selected Domain ID: ${data.debug.selectedDomainId}\n` +
-            `User Profiles Found: ${data.debug.userProfilesFound || 'N/A'}\n` +
-            `User Profiles: ${JSON.stringify(data.debug.userProfilesList || [], null, 2)}\n\n` +
+          const debugInfo = `Account set up successfully!\n` +
+            // `AWS Account ID: ${data.debug.awsAccountId}\n` +
+            // `Student ID: ${data.debug.studentID}\n` +
+            // `User Profile Name: ${data.debug.userProfileName}\n` +
+            // `Region: ${data.debug.region}\n` +
+            // `Role ARN: ${data.debug.roleArn}\n` +
+            // `Domains Found: ${data.debug.domainsFound}\n` +
+            // `Domains: ${JSON.stringify(data.debug.domainsList, null, 2)}\n` +
+            // `Selected Domain ID: ${data.debug.selectedDomainId}\n` +
+            // `User Profiles Found: ${data.debug.userProfilesFound || 'N/A'}\n` +
+            // `User Profiles: ${JSON.stringify(data.debug.userProfilesList || [], null, 2)}\n\n` +
             `Click OK to redirect to SageMaker Studio...`;
           
           alert(debugInfo);

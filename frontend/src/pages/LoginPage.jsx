@@ -58,14 +58,14 @@ function LoginPage() {
         <h1 className="text-2xl font-bold mb-6 text-center">Login Page</h1>
         <form onSubmit={handleLogin} className="space-y-4">
           <Input
-            label="Email is student@sit.singaporetech.edu.sg"
+            label="Email"
             type="email"
             placeholder="Enter your email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
           <Input
-            label="Password is teststudent"
+            label="Password"
             type="password"
             placeholder="Enter your password"
             value={password}

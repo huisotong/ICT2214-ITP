@@ -389,15 +389,18 @@ def send_message():
         internet_search = data.get("internet_search", False)
 
         # 1) Validate + assignment/agent
-        if not user_message or not user_id or not module_id:
-            return jsonify({"error": "module_id, message, and user_id are required"}), 400
+        # Basic required fields
+        if not user_message or not user_id:
+            return jsonify({"error": "message and user_id are required"}), 400
 
+        # You cannot have both module_id and agent_id
         if module_id and agent_id:
             return jsonify({"error": "Cannot specify both module_id and agent_id"}), 400
 
+        # You must have at least one
         if not module_id and not agent_id:
             return jsonify({"error": "Either module_id or agent_id is required"}), 400
-
+        
         assignment = None
         if module_id:
             assignment = ModuleAssignment.query.filter_by(userID=user_id, moduleID=str(module_id)).first()
@@ -575,6 +578,13 @@ def send_message():
             try:
                 with get_openai_callback() as cb_usage:
                     search_context = ""
+                    if agent_id and not module_id:
+                        prompt_text = f"{system_context}User: {user_message}\nAI:"
+                        streaming_llm.invoke([HumanMessage(content=prompt_text)])
+                        usage["prompt"] = cb_usage.prompt_tokens or 0
+                        usage["completion"] = cb_usage.completion_tokens or 0
+                        return
+    
                     if internet_search:
                         try:
                             search_context = internet_search_results(user_message)
@@ -649,7 +659,8 @@ def send_message():
                         else:
                             # No docs and internet search disabled -> outside scope
                             outside_msg = "I'm sorry — this topic is outside this module's scope. Please enable Internet Search for an open-web answer."
-                            q.put({"type": "done", "final": outside_msg, "chat_id": chat_id, "chat_title": chat_session.chatlog, "cost": 0})
+                            q.put({"type": "token", "data": outside_msg})
+                            return
 
                     # Track token usage after LLM returns
                     usage["prompt"] = cb_usage.prompt_tokens or 0
